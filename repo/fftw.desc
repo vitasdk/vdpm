@@ -1,0 +1,30 @@
+# Contributor: 
+# Maintainer:
+pkgname=fftw
+pkgver=3.3.4
+pkgdesc=""
+pkgurl="ftp://ftp.fftw.org/pub/fftw/fftw-3.3.4.tar.gz"
+license=""
+depends=""
+builddir="${builddir:-$pkgname/}"
+pkgdir="${pkgdir:-${pkgname}-pkg/}"
+prefix="${prefix:-${VITASDK:-/tmp}}"
+cflags="-std=c99 -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -ffast-math"
+
+build() {
+    cd "$builddir"
+    ./configure \
+        --host=arm-vita-eabi \
+        --prefix="$prefix" \
+        --sysconfdir="$prefix/etc" \
+        --mandir="$prefix/share/man" \
+                --disable-shared \
+                --enable-static \
+         || return 1
+    make || return 1
+}
+
+package() {
+    cd "$builddir"
+    make DESTDIR="$pkgdir" install || return 1
+}
