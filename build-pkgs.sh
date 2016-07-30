@@ -17,7 +17,7 @@ do
     if [ "${HAS_JOSH_K_SEAL_OF_APPROVAL:-false}" ]; then
         pushd packages
         pkg=$(find * -name "vitasdk-${package}-*.tar.xz")
-        curl -T "$pkg" -ujoshdekock:$BINTRAY_APIKEY "${TRAVIS_COMMIT}" "https://api.bintray.com/content/vitadev/ports/vitasdk-${package}/${TRAVIS_COMMIT}/$pkg"
+        curl -T "$pkg" -ujoshdekock:$BINTRAY_APIKEY "https://api.bintray.com/content/vitadev/ports/vitasdk-${package}/${TRAVIS_COMMIT}/$pkg"
         popd
     fi
 done
