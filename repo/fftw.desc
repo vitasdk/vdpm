@@ -12,7 +12,7 @@ prefix="${prefix:-${VITASDK:-/tmp}}"
 cflags="-std=c99 -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -ffast-math"
 
 build() {
-    cd "$builddir"
+    pushd "$builddir"
     ./configure \
         --host=arm-vita-eabi \
         --prefix="$prefix" \
@@ -22,6 +22,7 @@ build() {
                 --enable-static \
          || return 1
     make || return 1
+    popd
 }
 
 package() {
