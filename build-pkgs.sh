@@ -15,9 +15,11 @@ do
     ./build-pkg.sh "repo/${package}.desc" || exit 1
     tar xvf packages/vitasdk-${package}*.tar.xz -C $VITASDK/arm-vita-eabi
     if [ "${HAS_JOSH_K_SEAL_OF_APPROVAL:-false}" ]; then
-        pushd packages
-        pkg=$(find * -name "vitasdk-${package}-*.tar.xz")
-        curl -T "$pkg" -ujoshdekock:$BINTRAY_APIKEY "https://api.bintray.com/content/vitadev/ports/vitasdk-${package}/${TRAVIS_COMMIT}/$pkg"
-        popd
+        if [ "$TRAVIS_OS_NAME" == "linux" ]; then
+            pushd packages
+            pkg=$(find * -name "vitasdk-${package}-*.tar.xz")
+            curl -T "$pkg" -ujoshdekock:$BINTRAY_APIKEY "https://api.bintray.com/content/vitadev/ports/vitasdk-${package}/${TRAVIS_COMMIT}/$pkg"
+            popd
+        fi
     fi
 done
