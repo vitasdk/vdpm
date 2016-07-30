@@ -14,7 +14,7 @@ fi
 for package in "${packages[@]}"
 do
     ./build-pkg.sh "repo/${package}.desc" || exit 1
-    tar xvf packages/vitasdk-${package}*.tar.xz -C $VITASDK/arm-vita-eabi
+    tar xvf packages/vitasdk-${package}*.tar.xz -C $VITASDK
     if [ "${HAS_JOSH_K_SEAL_OF_APPROVAL:-false}" ]; then
         if [ "$TRAVIS_OS_NAME" == "linux" ]; then
             pushd packages

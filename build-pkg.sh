@@ -72,8 +72,8 @@ function download_and_extract
 # setup build
 mkdir -p build
 root="$(pwd)"
-prefix=/usr/local/vitasdk/arm-vita-eabi
-
+prefix_minus_vita=/usr/local/vitasdk
+prefix=${prefix_minus_vita}/arm-vita-eabi
 # get package description
 source "$package" || exit 256
 
@@ -115,7 +115,7 @@ cp "$package" "${pkgdir}${prefix}/share/vitaports/"
 echo "Bundling..."
 # make package
 mkdir -p "packages"
-pushd "${pkgdir}${prefix}"
+pushd "${pkgdir}${prefix_minus_vita}"
 tar cJvf "${root}/packages/vitasdk-${pkgname}-${pkgver}.tar.xz" .
 popd
 
