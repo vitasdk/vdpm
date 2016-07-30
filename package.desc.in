@@ -25,6 +25,7 @@ build() {
 }
 
 package() {
-    cd "$builddir"
+    pushd "$builddir"
     make DESTDIR="$pkgdir" install || return 1
+    popd
 }
