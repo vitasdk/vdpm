@@ -8,6 +8,7 @@ if [ "${HAS_JOSH_K_SEAL_OF_APPROVAL:-false}" ]; then
     export CC=arm-vita-eabi-gcc 
     export PKG_CONFIG_PATH=${VITASDK}/lib/pkgconfig/
     mkdir -p "${PKG_CONFIG_PATH}"
+    BINTRAY_PKG_VER=$(printf %04d ${TRAVIS_BUILD_NUMBER})
 fi
 
 for package in "${packages[@]}"
@@ -18,8 +19,17 @@ do
         if [ "$TRAVIS_OS_NAME" == "linux" ]; then
             pushd packages
             pkg=$(find * -name "vitasdk-${package}-*.tar.xz")
-            curl -T "$pkg" -ujoshdekock:$BINTRAY_APIKEY "https://api.bintray.com/content/vitadev/ports/vitasdk-${package}/${TRAVIS_COMMIT}/$pkg"
+            echo "$pkg" >> packages.list
+            curl -T "$pkg" -ujoshdekock:$BINTRAY_APIKEY "https://api.bintray.com/content/vitadev/dist/ports/${BINTRAY_PKG_VER}/$pkg"
             popd
         fi
     fi
 done
+
+if [ "${HAS_JOSH_K_SEAL_OF_APPROVAL:-false}" ]; then
+    if [ "$TRAVIS_OS_NAME" == "linux" ]; then
+        pushd packages
+        curl -T "packages.list" -ujoshdekock:$BINTRAY_APIKEY "https://api.bintray.com/content/vitadev/dist/ports/${BINTRAY_PKG_VER}/packages.list"
+        popd
+    fi
+fi
