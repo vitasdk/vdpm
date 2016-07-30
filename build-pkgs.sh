@@ -33,7 +33,7 @@ function build(){
 
 # manual dependencies
 build zlib && build libpng && build freetype2
-build libexif && libjpeg-turbo
+build libexif && build libjpeg-turbo
 build sqlite
 build fftw
 
