@@ -65,8 +65,8 @@ function download_and_extract
     name=`echo $url|sed -e "s/.*\///"`
     outdir=$2
     [ -d $outdir ] && echo "Deleting old version of $outdir" && rm -rf $outdir
-    [ -f $name ] && auto_extract $name $outdir || { wget --continue --no-check-certificate $url -O $name || rm -f $name; }
-    [ -f $name ] || wget --no-check-certificate $url -O $name && auto_extract $name $outdir
+    [ -f $name ] && auto_extract $name $outdir || { wget --continue --no-check-certificate $url -O $outdir-$name || rm -f $outdir-$name; }
+    [ -f $name ] || wget --no-check-certificate $url -O $outdir-$name && auto_extract $outdir-$name $outdir
 }
 
 # setup build

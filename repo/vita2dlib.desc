@@ -1,0 +1,25 @@
+# Contributor: 
+# Maintainer:
+pkgname=vita2dlib
+pkgver=git
+pkgdesc=""
+pkgurl="https://github.com/vitadev/vita2dlib/archive/master.tar.gz"
+license=""
+depends="libpng libjpeg-turbo freetype2"
+builddir="${builddir:-$pkgname/}"
+pkgdir="${pkgdir:-${pkgname}-pkg/}"
+prefix="${prefix:-${VITASDK:-/tmp}}"
+cflags="-std=c99 -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -ffast-math -ffat-lto-objects -flto"
+
+build() {
+    pushd "$builddir/libvita2d"
+    PREFIX=${prefix} make || return 1
+    popd
+}
+
+package() {
+    pushd "$builddir/libvita2d"
+    mkdir -p "$pkgdir$prefix"
+    make DESTDIR="$pkgdir" install || return 1
+    popd
+}

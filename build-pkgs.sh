@@ -28,13 +28,24 @@ function build(){
     if [ "${HAS_JOSH_K_SEAL_OF_APPROVAL:-false}" ]; then
         bintray "$package"
     fi
+    eval ${package}=true
 }
+
+zlib=false
+libpng=false
+freetype2=false
+libexif=false
+libjpeg-turbo=false
+sqlite=false
+fftw=false
 
 # manual dependencies
 build zlib && build libpng && build freetype2
 build libexif && build libjpeg-turbo
 build sqlite
 build fftw
+
+$libpng && ${libjpeg-turbo} && $freetype2 && build vita2dlib
 
 [ -f packages/broken.list ] && echo "Broken packages" && cat packages/broken.list
 
