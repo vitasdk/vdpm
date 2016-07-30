@@ -38,12 +38,14 @@ libexif=false
 libjpeg-turbo=false
 sqlite=false
 fftw=false
+jansson=false
 
 # manual dependencies
 build zlib && build libpng && build freetype2
 build libexif && build libjpeg-turbo
 build sqlite
 build fftw
+build jansson
 
 $libpng && ${libjpeg-turbo} && $freetype2 && build vita2dlib
 
