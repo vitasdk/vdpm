@@ -1,0 +1,31 @@
+# Contributor: 
+# Maintainer:
+pkgname=jansson
+pkgver=2.7
+pkgdesc=""
+pkgurl="http://www.digip.org/jansson/releases/jansson-2.7.tar.bz2"
+license="MIT"
+depends=""
+builddir="${builddir:-$pkgname/}"
+pkgdir="${pkgdir:-${pkgname}-pkg/}"
+prefix="${prefix:-${VITASDK:-/tmp}}"
+cflags="-std=c99 -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -ffast-math -ffat-lto-objects -flto"
+
+build() {
+    pushd "$builddir"
+    ./configure \
+        --host=arm-vita-eabi \
+        --prefix="$prefix" \
+        --sysconfdir="$prefix/etc" \
+                --disable-shared \
+                --enable-static \
+         || return 1
+    make || return 1
+    popd
+}
+
+package() {
+    pushd "$builddir"
+    make DESTDIR="$pkgdir" install || return 1
+    popd
+}
