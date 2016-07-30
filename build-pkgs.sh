@@ -16,7 +16,6 @@ function bintray(){
     if [ "$TRAVIS_OS_NAME" == "linux" ]; then
         pushd packages
         pkg=$(find * -name "vitasdk-${package}-*.tar.xz")
-        echo "$pkg" >> packages.list
         curl -T "$pkg" -ujoshdekock:$BINTRAY_APIKEY "https://api.bintray.com/content/vitadev/dist/ports/${BINTRAY_PKG_VER}/$pkg"
         popd
     fi
@@ -36,14 +35,6 @@ build zlib && build libpng && build freetype2
 build libexif && build libjpeg-turbo
 build sqlite
 build fftw
-
-if [ "${HAS_JOSH_K_SEAL_OF_APPROVAL:-false}" ]; then
-    if [ "$TRAVIS_OS_NAME" == "linux" ]; then
-        pushd packages
-        curl -T "packages.list" -ujoshdekock:$BINTRAY_APIKEY "https://api.bintray.com/content/vitadev/dist/ports/${BINTRAY_PKG_VER}/packages.list"
-        popd
-    fi
-fi
 
 [ -f packages/broken.list ] && echo "Broken packages" && cat packages/broken.list
 
