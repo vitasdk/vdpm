@@ -46,3 +46,5 @@ if [ "${HAS_JOSH_K_SEAL_OF_APPROVAL:-false}" ]; then
 fi
 
 [ -f packages/broken.list ] && echo "Broken packages" && cat packages/broken.list
+
+exit 0
