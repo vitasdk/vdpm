@@ -9,7 +9,7 @@ depends="zlib"
 builddir="${builddir:-$pkgname/}"
 pkgdir="${pkgdir:-${pkgname}-pkg/}"
 prefix="${prefix:-${VITASDK:-/tmp}}"
-cflags="$cflags -std=c99 -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -ffast-math -DPNG_NO_CONSOLE_IO"
+cflags="$cflags -std=c99 -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -ffast-math -DPNG_NO_CONSOLE_IO -ffat-lto-objects -flto"
 
 build() {
     pushd "$builddir"

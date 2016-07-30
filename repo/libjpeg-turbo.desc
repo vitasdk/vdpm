@@ -9,7 +9,7 @@ depends=""
 builddir="${builddir:-$pkgname/}"
 pkgdir="${pkgdir:-${pkgname}-pkg/}"
 prefix="${prefix:-${VITASDK:-/tmp}}"
-cflags="-std=c99 -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -ffast-math"
+cflags="-std=c99 -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -ffast-math -ffat-lto-objects -flto"
 
 build() {
     pushd "$builddir"
