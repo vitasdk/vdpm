@@ -113,6 +113,7 @@ configure_environment() {
   PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}
   XDG_DATA_DIRS=${PREFIX}/share:${XDG_DATA_DIRS}
   CFLAGS="-I${PREFIX}/include -I${DESTDIR}/${PREFIX}/include"
+  INCLUDES="$CFLAGS"
   LDFLAGS="-L${PREFIX}/lib -L${DESTDIR}/${PREFIX}/lib"
   TOOLCHAIN=arm-vita-eabi-
   CC=${TOOLCHAIN}gcc
@@ -120,7 +121,7 @@ configure_environment() {
   AR=${TOOLCHAIN}ar
   RANLIB=${TOOLCHAIN}ranlib
   unset PROMPT_COMMAND
-  export CFLAGS LDFLAGS PREFIX
+  export CFLAGS LDFLAGS PREFIX INCLUDES
   export PATH MANPATH LD_LIBRARY_PATH PKG_CONFIG_PATH XDG_DATA_DIRS
 }
 

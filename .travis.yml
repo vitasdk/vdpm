@@ -15,4 +15,7 @@ before_install:
     - export PATH=$VITASDK/bin:$PATH
 
 script:
-    - ./build-pkgs.sh
+    - ./vdpm -i zlib
+    - ./vdpm -i libpng libexif libjpeg
+    - ./vdpm -i jansson freetype
+    - ./vdpm -i sqlite
