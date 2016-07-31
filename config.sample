@@ -1,12 +1,8 @@
-# Configuration shellscript for slpm
+# Configuration shellscript for vdpm
 
 # for system wide use
-#DESTDIR="${VITASDK}"
-#PREFIX="/arm-vita-eabi"
-
-# packaging
+DESTDIR="${VITASDK}"
 PREFIX="/arm-vita-eabi"
-DESTDIR="${ROOT}/_prefix"
 
 WGET="wget --no-check-certificate -c"
 REMOTE="https://bintray.com/vitadev/dist/download_file?file_path="
@@ -26,7 +22,6 @@ MAKEFLAGS="-j4"
 
 EXTRA_CFGARGS=""
 
-# TODO: user-defined-per-package cflags or extra-cfgargs
 SYSDEPS=""
 IGNDIRS="/usr/share/locale /usr/share/doc"
 

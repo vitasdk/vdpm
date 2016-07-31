@@ -85,7 +85,7 @@ BINPKGDIR="${ROOT}/binpkg"
 MAKE=make
 mkdir -p "${TMPDIR}"
 export TMPDIR
-. "${ROOT}/config"
+[ -f "${ROOT}/config" ] && . "${ROOT}/config" || { echo "config file not found."; exit 1; }
 echo | md5sum >/dev/null 2>&1
 if [ $? = 0 ]; then
 	CHKSUM=md5sum
