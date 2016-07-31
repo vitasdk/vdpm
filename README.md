@@ -21,6 +21,8 @@ cd ports
 cp config.sample config
 ./bootstrap-vitasdk.sh # skip this step if you already have vitasdk installed
                        # to /usr/local/vitasdk and have $VITASDK set
+export VITASDK=/usr/local/vitadev # define $VITASDK if you havent already
+export PATH=$VITASDK/bin:$PATH # add vitasdk tool to $PATH if you havent already
 ./install-all.sh
 ```
 
@@ -33,6 +35,8 @@ cd ports
 cp config.sample config
 ./bootstrap-vitasdk.sh # skip this step if you already have vitasdk installed
                        # to /usr/local/vitasdk and have $VITASDK set
+export VITASDK=/usr/local/vitadev # define $VITASDK if you havent already
+export PATH=$VITASDK/bin:$PATH # add vitasdk tool to $PATH if you havent already
 ./install-all.sh
 ```
 
