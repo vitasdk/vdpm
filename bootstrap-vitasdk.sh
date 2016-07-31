@@ -4,7 +4,7 @@ VITASDK_VER=c86e2b4b45bd9cad07abbbcb208519b0357a639a
 
 case "$(uname -s)" in
    Darwin*)
-    VITASDK_PLATFORM=osx
+    VITASDK_PLATFORM=mac
     UNIX=true
     mkdir -p /usr/local/vitasdk
    ;;
