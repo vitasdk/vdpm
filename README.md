@@ -20,7 +20,7 @@ git clone https://github.com/vitadev/ports
 cd ports
 cp config.sample config
 ./bootstrap-vitasdk.sh # skip this step if you already have vitasdk installed
-                       # to /usr/local and have $VITASDK set
+                       # to /usr/local/vitasdk and have $VITASDK set
 ./install-all.sh
 ```
 
@@ -32,7 +32,7 @@ git clone https://github.com/vitadev/ports
 cd ports
 cp config.sample config
 ./bootstrap-vitasdk.sh # skip this step if you already have vitasdk installed
-                       # to /usr/local and have $VITASDK set
+                       # to /usr/local/vitasdk and have $VITASDK set
 ./install-all.sh
 ```
 
