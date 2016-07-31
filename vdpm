@@ -445,11 +445,6 @@ pkg_register() {
     tar czf ${BINPKGDIR}/vdpm-${PKG}.tgz *
     pkg_register_chksum ${PKG}
     ret=$?
-    if [ "$TRAVIS_OS_NAME" = "linux" ]; then
-      echo "=> Uploading vdpm-${PKG}.tgz to bintray..."
-      BINTRAY_PKG_VER=$(printf %04d ${TRAVIS_BUILD_NUMBER})
-      curl -T "${BINPKGDIR}/vdpm-${PKG}.tgz" -ujoshdekock:$BINTRAY_APIKEY "https://api.bintray.com/content/vitadev/dist/ports/${BINTRAY_PKG_VER}/vdpm-${PKG}.tgz?publish=1&override=1"
-    fi
   else
     echo "==> WARNING: Package have installed no files"
     : > "$NFODIR/$PKG/files"
@@ -460,6 +455,10 @@ pkg_register() {
   if [ "$ret" = 1 ]; then
     echo "==> Error registering checksums for pkg ${PKGNAME}"
     exit 1
+  elif [ "$TRAVIS_OS_NAME" = "linux" ]; then
+    echo "=> Uploading vdpm-${PKG}.tgz to bintray..."
+    BINTRAY_PKG_VER=$(printf %04d ${TRAVIS_BUILD_NUMBER})
+    curl -T "${BINPKGDIR}/vdpm-${PKG}.tgz" -ujoshdekock:$BINTRAY_APIKEY "https://api.bintray.com/content/vitadev/dist/ports/${BINTRAY_PKG_VER}/vdpm-${PKG}.tgz?publish=1&override=1"
   fi
 }
 
