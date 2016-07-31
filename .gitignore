@@ -1,0 +1,5 @@
+config
+.DS_Store
+*~
+_*
+binpkg
