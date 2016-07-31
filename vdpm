@@ -264,7 +264,9 @@ pkg_build() {
     fi
     if [ ! $? = 0 ]; then
       echo "=> Configure stage failed :("
+      echo "=> Dumping vdpm_config.log to stdout"
       [ -f vdpm_config.log ] && cat vdpm_config.log
+      echo "=> Dumping other config files to stdout"
       [ -f config.log ] && cat config.log
       [ -f configure.log ] && cat configure.log
       exit 1
@@ -282,8 +284,9 @@ pkg_build() {
       ${MAKE} ${TARGET} ${MAKEFLAGS} DESTDIR=${DESTDIR} PREFIX=${PREFIX} prefix=${PREFIX} exec_prefix=${PREFIX} > vdpm_make.log 2>&1
     fi
     if [ ! $? = 0 ]; then
-      [ -f vdpm_make.log ] && cat vdpm_make.log
       echo "=> Make stage failed :("
+      echo "=> Dumping vdpm_make.log to stdout"
+      [ -f vdpm_make.log ] && cat vdpm_make.log
       exit 1
     fi
     :> .vdpm_build_done
@@ -305,7 +308,7 @@ pkg_install() {
       (cd ${DESTDIR}/${PREFIX} ; eval $INSTALL_PRE)
     fi
     if [ -f setup.py ]; then
-      ${PYTHON} setup.py install --root "${DESTDIR}/${PREFIX}"
+      ${PYTHON} setup.py install --root "${DESTDIR}/${PREFIX}" > vdpm_make_install.log 2>&1
     else
       #if [ -f CMakeLists.txt ]; then
       #  PKGINSTALL_ARGS="DESTDIR=${PREFIX}"
@@ -314,7 +317,13 @@ pkg_install() {
       for a in ${PKGINSTALL_ARGS} ; do
     	eval export ${a}
       done
-      eval ${PKGINSTALL} ${PKGINSTALL_ARGS}
+      eval ${PKGINSTALL} ${PKGINSTALL_ARGS} > vdpm_make_install.log 2>&1
+    fi
+    if [ ! $? = 0 ]; then
+      echo "=> Make install stage failed :("
+      echo "=> Dumping vdpm_make_install.log to stdout"
+      [ -f vdpm_make_install.log ] && cat vdpm_make_install.log
+      exit 1
     fi
     if [ -n "${INSTALL_POST}" ]; then
       echo "=> Running post install script '${INSTALL_POST}'"
