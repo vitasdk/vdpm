@@ -1,19 +1,15 @@
 # Configuration shellscript for slpm
 
-# On OSX
-#CC="gcc -arch i386"
-
 # for system wide use
-#DESTDIR="${ROOT}/_prefix"
-#PREFIX="/"
+#DESTDIR="${VITASDK}"
+#PREFIX="/arm-vita-eabi"
 
+# packaging
 PREFIX="/arm-vita-eabi"
 DESTDIR="${ROOT}/_prefix"
 
 WGET="wget --no-check-certificate -c"
-REMOTE= #http://nopcode.org/slpm
-
-#PREFIX="/usr"
+REMOTE="https://bintray.com/vitadev/dist/download_file?file_path="
 
 CHROOTABLE=0
 DODEPS=1
@@ -31,7 +27,7 @@ MAKEFLAGS="-j4"
 EXTRA_CFGARGS=""
 
 # TODO: user-defined-per-package cflags or extra-cfgargs
-SYSDEPS="gettext glib"
+SYSDEPS=""
 IGNDIRS="/usr/share/locale /usr/share/doc"
 
 export WGET CFLAGS LDFLAGS EXTRA_CFGARGS CHKSUM IGNDIRS
