@@ -238,6 +238,7 @@ pkg_build() {
   if [ -e .vdpm_configure_done ]; then
     echo "=> Not running ${CONFIGURE} because of .vdpm_configure_done"
   else
+    echo "=> Running: ${PKGCONFIGURE:-$CONFIGURE}"
     if [ -n "${PRECONFIGURE}" ]; then
       eval ${PRECONFIGURE}
     fi
@@ -245,7 +246,7 @@ pkg_build() {
       PKGCONFIGURE="sh autogen.sh --prefix=${PREFIX}"
     fi
     if [ -n "${PKGCONFIGURE}" ]; then
-      eval ${PKGCONFIGURE}
+      eval ${PKGCONFIGURE} > vdpm_config.log 2>&1
     else
       if [ -f "setup.py" ]; then
         python setup.py build
@@ -256,14 +257,17 @@ pkg_build() {
 	      else
           [ -f ${CONFIGURE} ] && chmod +x ${CONFIGURE}
           if [ -x "${CONFIGURE}" ]; then
-            ${CONFIGURE} "--prefix=${PREFIX}" ${CFGARGS} ${USER_CFGARGS}
-            if [ ! $? = 0 ]; then
-              echo "=> Configure stage failed :("
-              exit 1
-            fi
+            ${CONFIGURE} "--prefix=${PREFIX}" ${CFGARGS} ${USER_CFGARGS} > vdpm_config.log 2>&1
           fi
         fi
       fi
+    fi
+    if [ ! $? = 0 ]; then
+      echo "=> Configure stage failed :("
+      [ -f vdpm_config.log ] && cat vdpm_config.log
+      [ -f config.log ] && cat config.log
+      [ -f configure.log ] && cat configure.log
+      exit 1
     fi
     :> .vdpm_configure_done
   fi
@@ -271,14 +275,17 @@ pkg_build() {
     echo "=> Not running ${MAKE} because of .vdpm_build_done"
   else
     if [ -n "${MAKEFUN}" ]; then
-      ${MAKEFUN}
+      echo "=> Running: ${MAKEFUN}"
+      ${MAKEFUN} > vdpm_make.log 2>&1
     else
-      ${MAKE} ${TARGET} ${MAKEFLAGS} DESTDIR=${DESTDIR} PREFIX=${PREFIX} prefix=${PREFIX} exec_prefix=${PREFIX}
+      echo "=> Running: ${MAKE} ${TARGET} ${MAKEFLAGS} DESTDIR=${DESTDIR} PREFIX=${PREFIX} prefix=${PREFIX} exec_prefix=${PREFIX}"
+      ${MAKE} ${TARGET} ${MAKEFLAGS} DESTDIR=${DESTDIR} PREFIX=${PREFIX} prefix=${PREFIX} exec_prefix=${PREFIX} > vdpm_make.log 2>&1
     fi
-    #if [ ! $? = 0 ]; then
-    #  echo "=> Make stage failed :("
-    #  exit 1
-    #fi
+    if [ ! $? = 0 ]; then
+      [ -f vdpm_make.log ] && cat vdpm_make.log
+      echo "=> Make stage failed :("
+      exit 1
+    fi
     :> .vdpm_build_done
   fi
 }
