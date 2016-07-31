@@ -10,7 +10,7 @@ env:
 - VITASDK_VER=c86e2b4b45bd9cad07abbbcb208519b0357a639a
 
 before_install:
-    - ./.travis.before_install.sh
+    - ./bootstrap-vitasdk.sh
     - export VITASDK=/usr/local/vitasdk
     - export PATH=$VITASDK/bin:$PATH
     - cp config.travis config
