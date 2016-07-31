@@ -1,10 +1,10 @@
 # Configuration shellscript for vdpm
 
 # for system wide use
-DESTDIR="/"
+DESTDIR=
 PREFIX="${VITASDK}"
 
-WGET="wget --no-check-certificate -c"
+WGET="wget -c"
 REMOTE="https://bintray.com/vitadev/dist/download_file?file_path="
 
 CHROOTABLE=0
