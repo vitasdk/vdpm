@@ -5,10 +5,41 @@ Ports is a project which aims on getting common libraries building for the PS Vi
 [vitasdk toolchain](https://github.com/vitasdk). It was based off the original idea of xerpi's
 vita\_portlibs.
 
+
+
+
 Usage
 =====
 
-The a script called `./vdpm` (VitaDev Package Manager) help with building libraries
+Getting started
+---------------
+
+### Mac & Linux
+```shell
+git clone https://github.com/vitadev/ports
+cd ports
+cp config.sample config
+./bootstrap-vitasdk.sh # skip this step if you already have vitasdk installed
+                       # to /usr/local and have $VITASDK set
+./install-all.sh
+```
+
+### Windows (msys2)
+```shell
+pacman -Syu
+pacman -S git
+git clone https://github.com/vitadev/ports
+cd ports
+cp config.sample config
+./bootstrap-vitasdk.sh # skip this step if you already have vitasdk installed
+                       # to /usr/local and have $VITASDK set
+./install-all.sh
+```
+
+vdpm
+----
+
+The VitaDev Package Manager (vdpm) helps with building libraries
 and software from their package description (in `pkg/*`).
 
 ```
