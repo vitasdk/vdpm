@@ -16,6 +16,9 @@ before_install:
 
 script:
     - ./vdpm -i zlib
-    - ./vdpm -i libpng libexif libjpeg
-    - ./vdpm -i jansson freetype
+    - ./vdpm -i libpng
+    - ./vdpm -i libexif
+    - ./vdpm -i libjpeg
+    - ./vdpm -i jansson
+    - ./vdpm -i freetype
     - ./vdpm -i sqlite
