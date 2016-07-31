@@ -417,7 +417,7 @@ pkg_register() {
     tar czf ${BINPKGDIR}/vdpm-${PKG}.tgz *
     pkg_register_chksum ${PKG}
     ret=$?
-    if [ "$TRAVIS_OS_NAME" == "linux" ]; then
+    if [ "$TRAVIS_OS_NAME" = "linux" ]; then
       echo "=> Uploading vdpm-${PKG}.tgz to bintray..."
       curl -T "${BINPKGDIR}/vdpm-${PKG}.tgz" -ujoshdekock:$BINTRAY_APIKEY "https://api.bintray.com/content/vitadev/dist/ports/${BINTRAY_PKG_VER}/vdpm-${PKG}.tgz"
     fi
