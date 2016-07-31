@@ -13,6 +13,8 @@ before_install:
     - ./.travis.before_install.sh
     - export VITASDK=/usr/local/vitasdk
     - export PATH=$VITASDK/bin:$PATH
+    - echo "REMOTE=" >> config
+    - echo "export REMOTE" >> CONFIG
 
 script:
     - ./vdpm -i zlib
