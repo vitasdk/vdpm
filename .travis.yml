@@ -22,3 +22,4 @@ script:
     - ./vdpm -i jansson
     - ./vdpm -i freetype
     - ./vdpm -i sqlite
+    - ./vdpm -i fftw
