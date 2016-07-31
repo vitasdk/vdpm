@@ -3,5 +3,5 @@ TYPE=tar
 DESC="sqlite3"
 TARGET="libsqlite3.la"
 PKGINSTALL="${MAKE} lib_install"
-USER_CFGARGS="--disable-shared --disable-threadsafe"
+USER_CFGARGS="--disable-shared --disable-threadsafe --build=x86" # explicit build host
 CFLAGS="${CFLAGS} -std=c99 -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -DSQLITE_OS_OTHER=1 -ffat-lto-objects -flto"
