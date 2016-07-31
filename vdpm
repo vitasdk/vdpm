@@ -290,6 +290,9 @@ pkg_install() {
   fi
   (
     cd "$WRKDIR/$PKG/${BASEDIR}"
+    if [ -n "${PREINSTALL}" ]; then
+      eval ${PREINSTALL}
+    fi
     if [ -n "${INSTALL_PRE}" ]; then
       echo "=> Running pre install script '${INSTALL_PRE}'"
       (cd ${DESTDIR}/${PREFIX} ; eval $INSTALL_PRE)
@@ -309,6 +312,9 @@ pkg_install() {
     if [ -n "${INSTALL_POST}" ]; then
       echo "=> Running post install script '${INSTALL_POST}'"
       (cd ${DESTDIR}/${PREFIX} ; eval $INSTALL_POST)
+    fi
+    if [ -n "${POSTINSTALL}" ]; then
+      eval ${POSTINSTALL}
     fi
   )
   pkg_register
@@ -376,6 +382,9 @@ pkg_register() {
   mkdir -p "${TMPDIR}/${PKG}/lib"
   mkdir -p "${TMPDIR}/${PKG}/man/man1"
 ## XXX: dupped from pkg_install
+    if [ -n "${PREINSTALL}" ]; then
+      eval ${PREINSTALL}
+    fi
     if [ -n "${INSTALL_PRE}" ]; then
       echo "=> Running pre install script '${INSTALL_PRE}'"
       (cd "${TMPDIR}/${PKG}" ; eval $INSTALL_PRE)
@@ -403,6 +412,9 @@ pkg_register() {
     if [ -n "${INSTALL_POST}" ]; then
       echo "=> Running post install script '${INSTALL_POST}'"
       (cd "${TMPDIR}/${PKG}" ; eval $INSTALL_POST)
+    fi
+    if [ -n "${POSTINSTALL}" ]; then
+      eval ${POSTINSTALL}
     fi
   # go register
   cd "${TMPDIR}/${PKG}"
