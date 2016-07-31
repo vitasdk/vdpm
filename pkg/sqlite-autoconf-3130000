@@ -1,7 +1,7 @@
-URL=https://www.sqlite.org/2016/sqlite-src-3130000.zip
+URL=https://www.sqlite.org/2016/sqlite-autoconf-3130000.tar.gz
 TYPE=tar
 DESC="sqlite3"
 TARGET="libsqlite3.la"
-PKGINSTALL="${MAKE} lib_install"
-USER_CFGARGS="--disable-shared --disable-threadsafe --build=x86" # explicit build host
+PKGINSTALL="${MAKE} install-libLTLIBRARIES install-data-am"
+USER_CFGARGS="--disable-shared --disable-threadsafe"
 CFLAGS="${CFLAGS} -std=c99 -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -DSQLITE_OS_OTHER=1 -ffat-lto-objects -flto"
