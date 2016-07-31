@@ -1,0 +1,800 @@
+#!/bin/sh
+#
+# vita dev package manager
+#
+# Copyright (c) 2009-2012, 2014, pancake <pancake@nopcode.org>
+# Copyright (c) 2016 Josh de Kock <josh@itanimul.li>
+#
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without modification,
+# are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+# * Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+# * Neither the name of the 'slpm' nor the names of its contributors
+# may be used to endorse or promote products derived from this software
+# without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ''AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE FOR ANY
+# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+# ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+whereami() {
+  for a in $PWD `echo $PATH | sed 's,:, ,g'` ; do
+    if [ -e "$a/$1" ]; then
+      echo "$a/$1"
+      return
+    fi
+  done
+  echo $1
+}
+
+lslibs() {
+  cd ${PREFIX}
+  export DYLD_LIBRARY_PATH=${PREFIX}/lib
+  export LD_LIBRARY_PATH=${PREFIX}/lib
+  for bin in `find bin usr/bin sbin usr/sbin 2>/dev/null` ; do
+    [ ! -f $bin ] && continue
+    [ ! -x $bin ] && continue
+    if [ -e /usr/bin/otool ]; then
+      otool -L $bin | grep -v :|awk '{print $1}'
+    else
+      ldd $bin | cut -d '>' -f 2- |cut -c 2-| \
+        grep ^/ | cut -d ' ' -f 1 | grep -v ${PREFIX}
+    fi
+  done
+}
+
+fixlibs() {
+  libs=$(lslibs |sort |uniq)
+  for a in $libs ; do
+    ba=$(basename $a)
+    if [ ! -e "${PREFIX}/lib/$ba" ]; then
+      echo $a
+    fi
+  done
+}
+
+BIN="`readlink $0`"
+[ -z "${BIN}" ] && BIN=$0
+[ -z "${BIN}" ] && BIN=/bin/sh # XXX?
+PATH=`whereami`:${PATH}
+ARG0="`whereami $BIN`"
+ROOT="`dirname $ARG0`"
+IGNEXE=0
+PYTHON=python
+USRDIR="${HOME}/.vdpm"
+WRKDIR="${ROOT}/_work"
+TMPDIR="${ROOT}/_work/tmp"
+PKGDIR="${ROOT}/pkg"
+PTXDIR="${ROOT}/patches"
+RMVDIR="${ROOT}/_removed"
+BINPKGDIR="${ROOT}/binpkg"
+MAKE=make
+mkdir -p "${TMPDIR}"
+export TMPDIR
+. "${ROOT}/config"
+echo | md5sum >/dev/null 2>&1
+if [ $? = 0 ]; then
+	CHKSUM=md5sum
+else
+	CHKSUM=md5
+fi
+NFODIR="${DESTDIR}/${PREFIX}/share/vdpm/pkg"
+BINPKG=0
+if [ -n "${SYSDEPS}" ]; then
+  igncmd="grep $(echo "-e$SYSDEPS" | sed -e 's, , -e,g')"
+else
+  igncmd="cat"
+fi
+export igncmd
+
+configure_environment() {
+  [ -f ${PREFIX}/etc/profile ] && ./ ${PREFIX}/etc/profile
+  if [ -d "${PREFIX}/etc/profile.d" ]; then
+    for a in ${PREFIX}/etc/profile.d/* ; do . $a ; done
+  fi
+  PATH=${DESTDIR}${PREFIX}/bin:${DESTDIR}${PREFIX}/sbin:${PATH}
+  MANPATH=${PREFIX}/share/man:${MANPATH}
+  LD_LIBRARY_PATH=${PREFIX}/lib:${LD_LIBRARY_PATH}
+  #DYLD_LIBRARY_PATH=${PREFIX}/lib:${LD_LIBRARY_PATH}
+  PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}
+  XDG_DATA_DIRS=${PREFIX}/share:${XDG_DATA_DIRS}
+  CFLAGS="-I${PREFIX}/include -I${DESTDIR}/${PREFIX}/include"
+  LDFLAGS="-L${PREFIX}/lib -L${DESTDIR}/${PREFIX}/lib"
+  TOOLCHAIN=arm-vita-eabi-
+  CC=${TOOLCHAIN}gcc
+  CXX=${TOOLCHAIN}g++
+  AR=${TOOLCHAIN}ar
+  RANLIB=${TOOLCHAIN}ranlib
+  unset PROMPT_COMMAND
+  export CFLAGS LDFLAGS PREFIX
+  export PATH MANPATH LD_LIBRARY_PATH PKG_CONFIG_PATH XDG_DATA_DIRS
+}
+
+# XXX a bit spaguetti
+hg_fetch() {
+  cd $WRKDIR
+  if [ -d "$1" ]; then
+    if [ "$3" = 1 ]; then
+      echo "==> hg: updating $1 ..."
+      ( cd "$1" ; hg pull && hg up )
+    fi
+  else
+    hg clone "$2" "$1"
+  fi
+}
+
+svn_fetch() {
+  cd $WRKDIR
+  if [ -d "$1" ]; then
+    if [ "$3" = 1 ]; then
+      echo "==> svn: updating $1 ..."
+      ( cd "$1" ; svn up )
+    fi
+  else
+    svn co "$2" "$1"
+  fi
+}
+
+git_fetch() {
+  cd "$WRKDIR"
+  if [ -d "$1" ]; then
+    if [ "$3" = 1 ]; then
+      ( cd "$1" ; git pull )
+    fi
+  else
+    git clone ${GITARGS} "$2" "$1"
+  fi
+}
+
+tar_fetch() {
+  FILE="`basename $URL`"
+  cd "$WRKDIR"
+  if [ -f "$WRKDIR/$FILE" ]; then
+    echo "==> Already downloaded $FILE"
+  else
+    [ -z "${WGET}" ] && WGET="wget --no-check-certificate -c"
+    ${WGET} ${URL} || exit 1
+  fi
+  if [ -f "$WRKDIR/$PKG/.vdpm_workdir_done" ]; then
+    echo "==> Already uncompressed and patched $PKG"
+  else
+    case "$FILE" in
+    *.zip) unzip $FILE ; ;;
+    *.tgz|*.gz) tar xzvf $FILE ; ;;
+    *.tbz2|*.bz2) tar xjvf $FILE ; ;;
+    *.xz) xz -d $FILE ; FILE2=`echo $FILE|sed -e s,.xz,,`; tar xvf $FILE2 ; ;;
+    esac
+    if [ ! $? = 0 ]; then
+      echo "==> Error uncompressing"
+      exit 1
+    fi
+    if [ -n "${PKGDIRNAME}" -a ! "${PKG}" = "${PKGDIRNAME}" ]; then
+     # hack to rename PKGDIR
+      mv ${PKGDIRNAME} ${PKG}
+    fi
+    :> "$WRKDIR/$PKG/.vdpm_workdir_done"
+  fi
+}
+
+pkg_fetch() {
+  eval ${TYPE}_fetch $PKG $URL $1
+  eval ${PKG_FETCH}
+}
+
+pkg_update() {
+  hg_fetch $PKG $URL
+}
+
+pkg_patch() {
+  if [ -n "${PATCHES}" ]; then
+    pushd ${WRKDIR}/${PKG}/${BASEDIR} > /dev/null
+    if [ -e .vdpm_patch_done ]; then
+      echo "=> Patches already applied."
+    else
+      echo "=> Patching ${PKG}.."
+      for a in ${PATCHES} ; do
+        patch -p1 < ${PTXDIR}/${a}.patch
+      done
+      :> .vdpm_patch_done
+    fi
+    popd > /dev/null
+  fi
+}
+
+pkg_unpatch() {
+  if [ -n "${PATCHES}" ]; then
+    pushd ${WRKDIR}/${PKG}/${BASEDIR} >/dev/null
+    if [ -e .vdpm_patch_done ]; then
+      echo "=> Unpatching ${PKG}.."
+      for a in ${PATCHES} ; do
+        patch -R -p1 < ${PTXDIR}/${a}.patch
+      done
+      rm -f .vdpm_patch_done
+    else
+      echo "=> Patches already not applied."
+    fi
+    popd > /dev/null
+  fi
+}
+
+pkg_build() {
+  cd "$WRKDIR/$PKG/${BASEDIR}"
+  [ "${IGNEXE}" = 1 ] && rm -f .vdpm_configure_done .vdpm_build_done
+  if [ -e .vdpm_configure_done ]; then
+    echo "=> Not running ${CONFIGURE} because of .vdpm_configure_done"
+  else
+    if [ -n "${PRECONFIGURE}" ]; then
+      eval ${PRECONFIGURE}
+    fi
+    if [ -f "autogen.sh" -a ! -f "configure" -a -z "${PKGCONFIGURE}" ]; then
+      PKGCONFIGURE="sh autogen.sh --prefix=${PREFIX}"
+    fi
+    if [ -n "${PKGCONFIGURE}" ]; then
+      eval ${PKGCONFIGURE}
+    else
+      if [ -f "setup.py" ]; then
+        python setup.py build
+        :> .vdpm_build_done
+      else
+        if [ -f "CMakeLists.txt" -a ! -f "configure" ]; then
+          cmake .  -DCMAKE_INSTALL_PREFIX=${PREFIX} ${CMARGS}
+	      else
+          [ -f ${CONFIGURE} ] && chmod +x ${CONFIGURE}
+          if [ -x "${CONFIGURE}" ]; then
+            ${CONFIGURE} "--prefix=${PREFIX}" ${CFGARGS} ${USER_CFGARGS}
+            if [ ! $? = 0 ]; then
+              echo "=> Configure stage failed :("
+              exit 1
+            fi
+          fi
+        fi
+      fi
+    fi
+    :> .vdpm_configure_done
+  fi
+  if [ -e .vdpm_build_done ]; then
+    echo "=> Not running ${MAKE} because of .vdpm_build_done"
+  else
+    if [ -n "${MAKEFUN}" ]; then
+      ${MAKEFUN}
+    else
+      ${MAKE} ${TARGET} ${MAKEFLAGS} DESTDIR=${DESTDIR} PREFIX=${PREFIX} prefix=${PREFIX} exec_prefix=${PREFIX}
+    fi
+    #if [ ! $? = 0 ]; then
+    #  echo "=> Make stage failed :("
+    #  exit 1
+    #fi
+    :> .vdpm_build_done
+  fi
+}
+
+pkg_install() {
+  if [ ! -d "$WRKDIR/$PKG/${BASEDIR}" ]; then
+    echo "pkg_install: Cannot open target directory"
+    exit 1
+  fi
+  (
+    cd "$WRKDIR/$PKG/${BASEDIR}"
+    if [ -n "${INSTALL_PRE}" ]; then
+      echo "=> Running pre install script '${INSTALL_PRE}'"
+      (cd ${DESTDIR}/${PREFIX} ; eval $INSTALL_PRE)
+    fi
+    if [ -f setup.py ]; then
+      ${PYTHON} setup.py install --root "${DESTDIR}/${PREFIX}"
+    else
+      #if [ -f CMakeLists.txt ]; then
+      #  PKGINSTALL_ARGS="DESTDIR=${PREFIX}"
+      #fi
+      echo "=> Running: ${PKGINSTALL} ${PKGINSTALL_ARGS}"
+      for a in ${PKGINSTALL_ARGS} ; do
+    	eval export ${a}
+      done
+      eval ${PKGINSTALL} ${PKGINSTALL_ARGS}
+    fi
+    if [ -n "${INSTALL_POST}" ]; then
+      echo "=> Running post install script '${INSTALL_POST}'"
+      (cd ${DESTDIR}/${PREFIX} ; eval $INSTALL_POST)
+    fi
+  )
+  pkg_register
+}
+
+pkg_chksum() {
+  if [ ! -e $NFODIR/$PKG/chksum ]; then
+    echo "Cannot find chksum database for $PKG"
+    return
+  fi
+  echo "# ${PKG}"
+  FILES=`cat $NFODIR/$PKG/files`
+  if [ -z "${FILES}" ]; then
+    echo "Is this an empty package?"
+    return
+  fi
+  for a in ${FILES} ; do
+    orig=`grep $a$ $NFODIR/$PKG/chksum | awk '{print $1}'`
+    cur=`$CHKSUM "${DESTDIR}/${PREFIX}/$a" | awk '{print $1}'`
+    if [ "$orig" = "$cur" ]; then
+      echo ". $orig $cur $a"
+    else
+      echo "x $orig $cur $a"
+    fi
+  done
+}
+
+pkg_register_chksum() {
+  PKGNAME=$1
+  FILES=`cat $NFODIR/$PKGNAME/files`
+  if [ -z "${FILES}" ]; then
+    echo "Is this an empty package?"
+    return 1
+  fi
+  ( cd ${DESTDIR}/${PREFIX}
+    for a in `cat $NFODIR/$PKGNAME/files` ; do
+      ${CHKSUM} "$a"
+    done
+  ) > $NFODIR/$PKGNAME/chksum
+  return 0
+}
+
+binpkg_register() {
+  PKGNAME=`basename $PKG | sed -e s,vdpm-,, -e s,.tgz,,`
+  echo "=> Register binary package $PKGNAME"
+  mkdir -p $NFODIR/$PKGNAME
+  tar tzf $PKG | grep -v /$ | grep -v vdpm.nfo > $NFODIR/$PKGNAME/files
+  pkg_register_chksum ${PKGNAME}
+  mv ${DESTDIR}/${PREFIX}/vdpm.nfo $NFODIR/$PKGNAME/vdpm.nfo
+  date > "$NFODIR/$PKGNAME/date"
+}
+
+binpkg_install() {
+  echo "=> Installing binary package"
+  tar xzvf $PKG -C ${DESTDIR}/${PREFIX} | grep -v vdpm.nfo | grep -v /$
+  binpkg_register
+}
+
+pkg_register() {
+  [ -d "$NFODIR/$PKG/${BASEDIR}" ] && return
+  cd "$WRKDIR/$PKG/${BASEDIR}"
+  # TODO: move outside and create skel in a standard way
+  mkdir -p "${TMPDIR}/${PKG}"
+  mkdir -p "${TMPDIR}/${PKG}/bin"
+  mkdir -p "${TMPDIR}/${PKG}/lib"
+  mkdir -p "${TMPDIR}/${PKG}/man/man1"
+## XXX: dupped from pkg_install
+    if [ -n "${INSTALL_PRE}" ]; then
+      echo "=> Running pre install script '${INSTALL_PRE}'"
+      (cd "${TMPDIR}/${PKG}" ; eval $INSTALL_PRE)
+    fi
+  #PKGINSTALL_ARGS="DESTDIR=${DESTDIR} INSTALL_ROOT=${DESTDIR} PREFIX=${PREFIX} prefix=${PREFIX} exec_prefix=${PREFIX}"
+  PKGINSTALL_ARGS="PREFIX=/ DESTDIR=${TMPDIR}/${PKG} prefix=/ exec_prefix=${PREFIX}"
+  if [ -f setup.py ]; then
+      ${PYTHON} setup.py install --root "${TMPDIR}/${PKG}" || exit 1
+  else
+    for a in ${PKGINSTALL_ARGS} ; do
+    	eval export ${a}
+    done
+    eval ${PKGINSTALL} ${PKGINSTALL_ARGS}
+    echo "=> Running ${PKGINSTALL} ${PKGINSTALL_ARGS}"
+    DD="${TMPDIR}/${PKG}"
+    eval DESTDIR=${DD} INSTALL_ROOT=${DD}  \
+      ${PKGINSTALL} PREFIX=/ "DESTDIR=${TMPDIR}/${PKG}" prefix=/ || exit 1
+  fi
+    #-if [ ! $? = 0 ]; then
+    #-  echo "=> Install fail"
+    #-  exit 1
+    #-fi
+#"prefix=${TMPDIR}/${PKG}"
+## XXX: dupped from pkg_install
+    if [ -n "${INSTALL_POST}" ]; then
+      echo "=> Running post install script '${INSTALL_POST}'"
+      (cd "${TMPDIR}/${PKG}" ; eval $INSTALL_POST)
+    fi
+  # go register
+  cd "${TMPDIR}/${PKG}"
+  echo "${TMPDIR}/${PKG}"
+  mkdir -p "$NFODIR/$PKG"
+  if [ -n "`ls`" ]; then
+    _pfx=`pwd | cut -c 2-`
+    (find * -type f ; find * -type l ) | \
+      sed -e "s,$_pfx,," > "$NFODIR/$PKG/files"
+    echo "=> Create binary package: ${BINPKGDIR}/vdpm-${PKG}.tgz"
+    cp ${PKGDIR}/${PKG} vdpm.nfo
+    tar czf ${BINPKGDIR}/vdpm-${PKG}.tgz *
+    pkg_register_chksum ${PKG}
+    ret=$?
+  else
+    echo "==> WARNING: Package have installed no files"
+    : > "$NFODIR/$PKG/files"
+  fi
+  date > "$NFODIR/$PKG/date"
+  cp ${PKGDIR}/${PKG} $NFODIR/$PKG/vdpm.nfo
+  rm -rf "${TMPDIR}/${PKG}"
+  if [ "$ret" = 1 ]; then
+    echo "==> Error registering checksums for pkg ${PKGNAME}"
+    exit 1
+  fi
+}
+
+pkg_clean() {
+  cd "$WRKDIR/$PKG"
+  rm -f .vdpm_configure_done .vdpm_build_done
+  ${MAKE} clean
+}
+
+pkg_deinstall() {
+  if [ -e "$NFODIR/$PKG/files" ]; then
+    cd "${DESTDIR}/${PREFIX}"
+    for a in `cat $NFODIR/$PKG/files`; do
+      [ -f "./$a" ] && echo "./$a" && rm -f "./$a"
+    done
+    rm -rf "$NFODIR/$PKG"
+  else
+    if [ -d "$WRKDIR/$PKG" ]; then
+      cd "$WRKDIR/$PKG"
+# TODO: wrap into ${PKGDEINSTALL}
+      ${MAKE} uninstall DESTDIR=${DESTDIR} PREFIX=${PREFIX} prefix=${PREFIX}
+    fi
+  fi
+}
+
+help() {
+  cat <<EOF
+Usage: vdpm [-iudlLx] [pkg pkg ..]
+ -x : execute or enter into the vdpm shell
+ -u : upgrade package
+ -i : install package (.tgz or pkgname)
+ -d : deinstall package
+ -c : clean package (-ci to clean + install)
+ -C : check checksum of pkg files (u=unmodified, m=modified)
+ -r : remove devel/man/doc files to _remove/
+      -r: list, -ri: reinstall, -rm: remove
+ -s : search package by keyword
+ -l : list installed packages or pkg files
+ -L : list all available packages (-LL for description)
+ -f : find missing libraries
+      -fi: install, -fl: list, -fd: remove
+ -p : patch package
+ -P : unpatch package
+EOF
+  exit 1
+}
+
+exec_shell() {
+  if [ "${CHROOTABLE}" = 1 ]; then
+    OSHELL=${SHELL}
+    SHELL=""
+    [ -x "${PREFIX}/bin/rc" ] && SHELL="${PREFIX}/bin/rc"
+    [ -x "${PREFIX}/bin/ksh" ] && SHELL="${PREFIX}/bin/ksh"
+    [ -x "${PREFIX}/bin/dash" ] && SHELL="${PREFIX}/bin/dash"
+    [ -x "${PREFIX}/bin/bash" ] && SHELL="${PREFIX}/bin/bash"
+    [ -x "${PREFIX}/bin/sh" ] && SHELL="${PREFIX}/bin/sh"
+    if [ -z "${SHELL}" ]; then
+      echo "Cannot find shell. Please install dash, bash, busybox or 9base"
+      echo "Or set CHROOTABLE=0 in config to disable the chrootable mode"
+      SHELL=${OSHELL}
+    fi
+  fi
+  configure_environment
+  PATH=${DESTDIR}${PREFIX}/bin:${DESTDIR}${PREFIX}/sbin:${PATH}
+  MANPATH=${PREFIX}/share/man:${MANPATH}
+  LD_LIBRARY_PATH=${PREFIX}/lib:${LD_LIBRARY_PATH}
+  DYLD_LIBRARY_PATH=${PREFIX}/lib:${LD_LIBRARY_PATH}
+  PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}
+  unset PROMPT_COMMAND
+  export PATH MANPATH LD_LIBRARY_PATH PKG_CONFIG_PATH DYLD_LIBRARY_PATH
+  if [ -z "$1" ]; then
+    eval ${SHELL}
+  else
+    eval $@
+  fi
+  exit $?
+}
+
+mkdir -p "${NFODIR}" "${WRKDIR}" "${BINPKGDIR}"
+[ ! -e "${NFODIR}/.fixedlibs" ] && touch ${NFODIR}/.fixedlibs
+
+remove_list() {
+  # broken symlinks .. try to fix them?
+  # manpages
+  echo ${PREFIX}/share/man
+  echo ${PREFIX}/man
+  # MYSELF echo ${PREFIX}/var/lib/vdpm
+  echo ${PREFIX}/share/info
+  echo ${PREFIX}/share/doc
+  # devel
+  echo ${PREFIX}/include
+  echo ${PREFIX}/lib/*.a
+  echo ${PREFIX}/lib/*.la
+  echo ${PREFIX}/lib/pkgconfig
+  echo ${PREFIX}/share/vala/vapi
+}
+
+remove_move() {
+  for a in `remove_list` ; do
+    if [ ! -e "$a" ]; then
+      continue
+    fi
+    d=`dirname "$a" | sed -e s,${PREFIX},${RMVDIR},`
+    mkdir -p "$d"
+    if [ -d "$a" ]; then
+      n=`basename $a`
+      cp -rf $a/* "$d/$n/"
+      rm -rf "$a"
+      echo "$d/$n/"
+    else
+      n=`basename $a`
+      echo "$d/$n"
+      mv -f "$a" "$d"
+    fi
+  done
+}
+
+remove_install() {
+  if [ -d "${RMVDIR}" -a -d "${RMVDIR}" ]; then
+    cp -rf ${RMVDIR}/* ${PREFIX}/
+  fi
+}
+
+remove_empty() {
+  # find empty directories and kill them all
+  find ${PREFIX} -type d -empty -exec rmdir {} \;
+}
+
+DO=
+while [ -n "$1" ]; do
+  case "$1" in
+  -r) remove_list "$@" ; exit 0 ; ;;
+  -re) remove_empty ; exit 0 ; ;;
+  -rm) remove_move "$@" ; exit 0 ; ;;
+  -ri) remove_install "$2" ; exit 0 ; ;;
+  -f) fixlibs ; exit 0 ; ;;
+  -fi)
+    mkdir -p ${DESTDIR}/${PREFIX}/lib
+    for a in `fixlibs` ; do
+      cp $a ${DESTDIR}/${PREFIX}/lib
+      echo $(basename $a) >> ${NFODIR}/.fixedlibs
+    done
+    exit 0
+    ;;
+  -fl) cat ${NFODIR}/.fixedlibs ; exit 0 ; ;;
+  -fd)
+    for a in $(cat ${NFODIR}/.fixedlibs) ; do
+      echo $a
+      rm -f ${DESTDIR}/${PREFIX}/lib/$a
+    done
+    :> ${NFODIR}/.fixedlibs
+    exit 0
+    ;;
+  -x) shift ; exec_shell $@ ; ;;
+  -h) help ; ;;
+  -ci)
+    cmd=$0
+    shift
+    $cmd -c $@
+    $cmd -i $@
+    exit 0
+    ;;
+  -k)
+    if [ -z "$2" ]; then
+      cd ${WRKDIR} ; ls -F | grep / | sed -e s,/,,
+    else
+      p=`$0 -k | grep $2 | head -n 1`
+      if [ -n "$p" ]; then
+        echo "Killing $p..."
+        cd ${WRKDIR} ; rm -rf $p
+      else
+        echo "No package matching $2"
+        exit 1
+      fi
+    fi
+    exit 0
+    ;;
+  -p|-P|-c|-C|-i|-I|-u|-d) DO=$1 ; ;;
+  -s)
+    if [ -z "$2" ]; then
+      echo "Usage: vdpm -s [keyword]"
+    else
+      cd ${PKGDIR} && grep DESC * | grep -i "$2"
+    fi
+    exit 0
+    ;;
+  -L) ls ${PKGDIR} | cat ; exit 0 ; ;;
+  -LL)
+     for a in `ls ${PKGDIR}`; do
+       . ${PKGDIR}/$a
+       printf "%20s  $DESC\n" $a
+     done ; exit 0 ; ;;
+  -ll)
+     cd ${NFODIR}
+     for a in `echo *`; do
+       if [ -e "${NFODIR}/$a/vdpm.nfo" ]; then
+         . ${NFODIR}/$a/vdpm.nfo
+         printf "%20s  $DESC\n" $a
+       else
+         printf "%20s  (no description)\n" $a
+       fi
+     done
+     exit 0
+    ;;
+  -l)
+    if [ -z "$2" ]; then
+      ls "$NFODIR" | cat ; exit 0
+    else
+      if [ ! -d "$NFODIR/$2" ]; then
+        PKGNAME=`basename $NFODIR/$2* 2> /dev/null` # autocomplete
+        if [ ! -d "$NFODIR/$PKGNAME" ]; then
+          echo "Package $2 not installed" ; exit 1
+        else
+          cat "$NFODIR/$PKGNAME/files" ; exit 0
+        fi
+      else
+        cat "$NFODIR/$2/files" ; exit 0
+      fi
+    fi
+    ;;
+  -*) echo "Unknown flag '$1'" ;;
+  *) break ;;
+  esac
+  shift
+done
+
+show_msg() {
+  echo ""
+  echo "=="
+  echo "  ${1}"
+  echo "=="
+  echo ""
+  sleep 1
+}
+
+pkg_open() {
+  PREMSG=""
+  MSG=""
+  URL=""
+  TYPE="tar"
+  DESC=""
+  DEPS=""
+  MAKEFUN=""
+  CFGARGS="--host=arm-vita-eabi"
+  CMARGS="-DCMAKE_SYSTEM_NAME=Generic -DCMAKE_C_COMPILER=$CC -DCMAKE_CXX_COMPILER=$CXX -DCMAKE_RANLIB=$RANLIB -DCMAKE_AR=$AR -DCMAKE_FIND_ROOT_PATH=${VITASDK}/arm-vita-eabi -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER"
+  BASEDIR=""
+  PKGDIRNAME=""
+  INSTALL_POST="" # script to run after install
+  PKGINSTALL="${MAKE} install"
+  PKGINSTALL_ARGS="DESTDIR=${DESTDIR} INSTALL_ROOT=${DESTDIR} PREFIX=${PREFIX} prefix=${PREFIX} exec_prefix=${PREFIX}"
+  PKGCONFIGURE=""
+  CONFIGURE="./configure"
+  BINPKG=0
+  if [ -n "${REMOTE}" ]; then
+    here=$(pwd)
+    cd ${BINPKGDIR}
+    eval ${WGET} ${REMOTE}/vdpm-${PKG}.tgz
+    if [ $? = 0 ]; then
+      PKG=${BINPKGDIR}/vdpm-${PKG}.tgz
+    else
+      echo "=> Cannot find this package remotely"
+    fi
+    cd ${here}
+  fi
+
+  if [ "`echo $PKG|grep .tgz$`" ]; then
+    tar xvzf ${PKG} vdpm.nfo
+    if [ ! $? = 0 ]; then
+      echo "This is not a binary vdpm package"
+      exit 1
+    fi
+    . ./vdpm.nfo
+    rm -f vdpm.nfo
+    BINPKG=1
+    return
+  fi
+
+  # hack to support to uninstall packages without finding the pkg description
+  # XXX this needs to be fixed
+  if [ "$DO" = "-d" ]; then
+    if [ -f "$NFODIR/$PKG/vdpm.nfo" ]; then
+      . "${NFODIR}/$PKG/vdpm.nfo"
+    else
+      PKG2=`basename $NFODIR/$PKG* 2> /dev/null` # autocomplete
+      if [ -f "$NFODIR/$PKG2/vdpm.nfo" ]; then
+        . "${NFODIR}/${PKG2}/vdpm.nfo"
+        PKG=$PKG2
+      else
+        echo "Cannot find $PKG"
+        exit 1
+      fi
+    fi
+    return
+  fi
+
+  if [ ! -f "$PKGDIR/$PKG" ]; then
+    PKG2=`basename $PKGDIR/$PKG* 2> /dev/null` # autocomplete
+    if [ ! -f "$PKGDIR/$PKG2" ]; then
+      echo "Cannot find $PKG"
+      exit 1
+    fi
+    PKG=$PKG2
+  fi
+  . "${PKGDIR}/$PKG"
+  if [ -e "${USRDIR}/$PKG" ]; then
+    . "${USRDIR}/$PKG"
+  fi
+  # TODO: check package variables
+  if [ -z "${URL}" ]; then echo "No URL defined in package"; fi
+  if [ -z "${TYPE}" ]; then echo "No TYPE defined in package"; fi
+  [ -n "${PREMSG}" ] && show_msg "pkg_open: ${PKG}: ${PREMSG}"
+  if [ -n "${CONFLICT}" ]; then
+    HAS_CONFLICT=no
+    for a in ${CONFLICT} ; do
+      if [ -e "${NFODIR}/$a/vdpm.nfo" ]; then
+        echo "Package ${PKG} conflicts with $a"
+        HAS_CONFLICT=yes
+      fi
+    done
+    [ "${HAS_CONFLICT}" = yes ] && exit 1
+  fi
+  if [ "${DODEPS}" = 1 ]; then
+    for DEP in ${DEPS}; do
+      if [ -z "`echo $DEP | $igncmd`" ]; then
+        echo "=> Checking dependency $DEP"
+        vdpm -l | grep ${DEP}
+        if [ $? = 0 ]; then
+          echo "=> OK"
+        else
+          echo "=> Not found. Installing pkg..."
+          vdpm -i ${DEP} || exit 1
+        fi
+        continue
+      else
+        echo "=> Asuming $DEP is a system package"
+        continue
+      fi
+      if [ ! -e "${NFODIR}/${DEP}" ]; then
+        echo "=> Installing missing dependency ${DEP}"
+        $0 -i ${DEP}
+        if [ ! $? = 0 ]; then
+          echo "=> Install of ${DEP} has failed"
+          exit 1
+        fi
+      fi
+    done
+  fi
+  [ -n "${MSG}" ] && show_msg "pkg_open: ${PKG} ${MSG}"
+}
+
+[ -z "$1" ] && help
+configure_environment
+while [ -n "$1" ]; do
+  PKG=$1
+  pkg_open
+  case $DO in
+  -C) (pkg_chksum) ; ;;
+  -c) (pkg_clean) ; ;;
+  -p) (pkg_patch) ; ;;
+  -P) (pkg_unpatch) ; ;;
+  -i) if [ ${BINPKG} = 1 ]; then
+        (binpkg_install)
+      else
+        (pkg_fetch) && (pkg_patch) && (pkg_build) && (pkg_install) 
+        exit $? # honor return code
+      fi ; ;;
+  -u) (pkg_fetch 1) && (pkg_clean) ; (pkg_build) && (pkg_install) ; ;;
+  -d) (pkg_deinstall) ; ;;
+  *) (pkg_fetch) ; ;;
+  esac
+  shift
+done

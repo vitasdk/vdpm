@@ -1,0 +1,37 @@
+# Configuration shellscript for slpm
+
+# On OSX
+#CC="gcc -arch i386"
+
+# for system wide use
+#DESTDIR="${ROOT}/_prefix"
+#PREFIX="/"
+
+PREFIX="/arm-vita-eabi"
+DESTDIR="${ROOT}/_prefix"
+
+WGET="wget --no-check-certificate -c"
+REMOTE= #http://nopcode.org/slpm
+
+#PREFIX="/usr"
+
+CHROOTABLE=0
+DODEPS=1
+
+IGNEXE=0 # set to '1' to ignore .configure_executed and .build_executed
+#CHKSUM=md5sum
+
+# Directory to store binary packages
+#BINPKGDIR=/tmp
+
+CFLAGS="-O2 -Wall"
+#LDFLAGS="-static"
+MAKEFLAGS="-j4"
+
+EXTRA_CFGARGS=""
+
+# TODO: user-defined-per-package cflags or extra-cfgargs
+SYSDEPS="gettext glib"
+IGNDIRS="/usr/share/locale /usr/share/doc"
+
+export WGET CFLAGS LDFLAGS EXTRA_CFGARGS CHKSUM IGNDIRS

@@ -1,0 +1,5 @@
+URL=http://download.savannah.gnu.org/releases/freetype/freetype-2.6.5.tar.bz2
+DESC=FreeType
+TYPE=tar
+USER_CFGARGS="--disable-shared --enable-static --without-harfbuzz --without-bzip2"
+CFLAGS="${CFLAGS} -std=c99 -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -ffast-math -ffat-lto-objects -flto"

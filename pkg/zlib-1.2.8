@@ -1,0 +1,5 @@
+URL=http://zlib.net/zlib-1.2.8.tar.gz
+TYPE=tar
+DESC="zip library"
+PKGCONFIGURE="CHOST=arm-vita-eabi ./configure"
+CFLAGS="${CFLAGS} -std=c99 -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -ffast-math -ffat-lto-objects -flto"

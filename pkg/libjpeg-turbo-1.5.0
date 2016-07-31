@@ -1,0 +1,6 @@
+URL=http://downloads.sourceforge.net/libjpeg-turbo/libjpeg-turbo-1.5.0.tar.gz
+TYPE=tar
+DESC="MMX/SSE optimized version of libjpeg (2-4x faster) only for x86,x86-64"
+USER_CFGARGS="--disable-shared --enable-static --without-simd"
+PKGINSTALL="${MAKE} install-libLTLIBRARIES install-data-am"
+CFLAGS="${CFLAGS} -std=c99 -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -ffast-math -ffat-lto-objects -flto"

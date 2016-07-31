@@ -35,7 +35,7 @@ zlib=false
 libpng=false
 freetype2=false
 libexif=false
-libjpeg-turbo=false
+libjpeg_turbo=false
 sqlite=false
 fftw=false
 jansson=false
@@ -47,7 +47,7 @@ build sqlite
 build fftw
 build jansson
 
-$libpng && ${libjpeg-turbo} && $freetype2 && build vita2dlib
+$libpng && ${libjpegturbo} && $freetype2 && build vita2dlib
 
 [ -f packages/broken.list ] && echo "Broken packages" && cat packages/broken.list
 

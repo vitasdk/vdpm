@@ -1,0 +1,7 @@
+URL=https://www.sqlite.org/2016/sqlite-src-3130000.zip
+TYPE=tar
+DESC="sqlite3"
+TARGET="libsqlite3.la"
+PKGINSTALL="${MAKE} lib_install"
+USER_CFGARGS="--disable-shared --disable-threadsafe --disable-dynamic-extensions"
+CFLAGS="${CFLAGS} -std=c99 -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -DSQLITE_OS_OTHER=1 -ffat-lto-objects -flto"
