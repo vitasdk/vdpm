@@ -6,7 +6,7 @@ case "$(uname -s)" in
    Darwin*)
     VITASDK_PLATFORM=osx
     UNIX=true
-    mkdir /usr/local/vitasdk
+    mkdir -p /usr/local/vitasdk
    ;;
 
    Linux*)
@@ -19,10 +19,15 @@ case "$(uname -s)" in
     sudo chown $USER:$USER /usr/local/vitasdk
    ;;
 
-   CYGWIN*|MINGW32*|MSYS*)
+   MSYS*)
     UNIX=false
     pacman -Syu --noconfirm make git wget p7zip tar
     mkdir -p /usr/local/
+   ;;
+
+   CYGWIN*|MINGW32*)
+    echo "Please use msys2. Exiting..."
+    exit 1
    ;;
 
    *)
