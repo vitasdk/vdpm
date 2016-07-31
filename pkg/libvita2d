@@ -1,0 +1,9 @@
+URL=https://github.com/xerpi/libvita2d
+TYPE=git
+DESC="2D graphics library for the PS Vita"
+DEPS="libpng freetype"
+# support weird dir structure
+PRECONFIGURE="pushd libvita2d"
+POSTCONFIGURE="popd"
+PREINSTALL="pushd libvita2d"
+POSTINSTALL="popd"
