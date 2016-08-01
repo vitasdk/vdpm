@@ -2,7 +2,7 @@
 
 # for system wide use
 DESTDIR=
-PREFIX="${VITASDK}"
+PREFIX="${VITASDK}/arm-vita-eabi"
 
 WGET="wget -c"
 REMOTE="https://bintray.com/vitadev/dist/download_file?file_path="
