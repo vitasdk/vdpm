@@ -1,7 +1,7 @@
-Vitadev Ports
+Vitadev Package manager
 =============
 
-Ports is a project which aims on getting common libraries building for the PS Vita using the
+VDPM is a project which aims on getting common libraries building for the PS Vita using the
 [vitasdk toolchain](https://github.com/vitasdk). It was based off the original idea of xerpi's
 vita\_portlibs.
 
@@ -16,7 +16,7 @@ Getting started
 
 ### Mac & Linux
 ```shell
-git clone https://github.com/vitadev/ports
+git clone https://github.com/vitadev/vdpm
 cd ports
 cp config.sample config
 ./bootstrap-vitasdk.sh # skip this step if you already have vitasdk installed
@@ -30,7 +30,7 @@ export PATH=$VITASDK/bin:$PATH # add vitasdk tool to $PATH if you havent already
 ```shell
 pacman -Syu
 pacman -S git
-git clone https://github.com/vitadev/ports
+git clone https://github.com/vitadev/vdpm
 cd ports
 cp config.sample config
 ./bootstrap-vitasdk.sh # skip this step if you already have vitasdk installed
@@ -43,7 +43,7 @@ export PATH=$VITASDK/bin:$PATH # add vitasdk tool to $PATH if you havent already
 vdpm
 ----
 
-The VitaDev Package Manager (vdpm) helps with building libraries
+vdpm helps with building libraries
 and software from their package description (in `pkg/*`).
 
 ```
