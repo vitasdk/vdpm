@@ -92,7 +92,7 @@ if [ $? = 0 ]; then
 else
 	CHKSUM=md5
 fi
-NFODIR="${DESTDIR}/${PREFIX}/var/vdpm/pkg"
+NFODIR="${DESTDIR}${PREFIX}/var/vdpm/pkg"
 BINPKG=0
 if [ -n "${SYSDEPS}" ]; then
   igncmd="grep $(echo "-e$SYSDEPS" | sed -e 's, , -e,g')"
@@ -112,9 +112,9 @@ configure_environment() {
   #DYLD_LIBRARY_PATH=${PREFIX}/lib:${LD_LIBRARY_PATH}
   PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}
   XDG_DATA_DIRS=${PREFIX}/share:${XDG_DATA_DIRS}
-  CFLAGS="-I${PREFIX}/include -I${DESTDIR}/${PREFIX}/include"
+  CFLAGS="-I${PREFIX}/include -I${DESTDIR}${PREFIX}/include"
   INCLUDES="$CFLAGS"
-  LDFLAGS="-L${PREFIX}/lib -L${DESTDIR}/${PREFIX}/lib"
+  LDFLAGS="-L${PREFIX}/lib -L${DESTDIR}${PREFIX}/lib"
   TOOLCHAIN=arm-vita-eabi-
   CC=${TOOLCHAIN}gcc
   CXX=${TOOLCHAIN}g++
@@ -305,10 +305,10 @@ pkg_install() {
     fi
     if [ -n "${INSTALL_PRE}" ]; then
       echo "=> Running pre install script '${INSTALL_PRE}'"
-      (cd ${DESTDIR}/${PREFIX} ; eval $INSTALL_PRE)
+      (cd ${DESTDIR}${PREFIX} ; eval $INSTALL_PRE)
     fi
     if [ -f setup.py ]; then
-      ${PYTHON} setup.py install --root "${DESTDIR}/${PREFIX}" > vdpm_make_install.log 2>&1
+      ${PYTHON} setup.py install --root "${DESTDIR}${PREFIX}" > vdpm_make_install.log 2>&1
     else
       #if [ -f CMakeLists.txt ]; then
       #  PKGINSTALL_ARGS="DESTDIR=${PREFIX}"
@@ -327,7 +327,7 @@ pkg_install() {
     fi
     if [ -n "${INSTALL_POST}" ]; then
       echo "=> Running post install script '${INSTALL_POST}'"
-      (cd ${DESTDIR}/${PREFIX} ; eval $INSTALL_POST)
+      (cd ${DESTDIR}${PREFIX} ; eval $INSTALL_POST)
     fi
     if [ -n "${POSTINSTALL}" ]; then
       eval ${POSTINSTALL}
@@ -349,7 +349,7 @@ pkg_chksum() {
   fi
   for a in ${FILES} ; do
     orig=`grep $a$ $NFODIR/$PKG/chksum | awk '{print $1}'`
-    cur=`$CHKSUM "${DESTDIR}/${PREFIX}/$a" | awk '{print $1}'`
+    cur=`$CHKSUM "${DESTDIR}${PREFIX}/$a" | awk '{print $1}'`
     if [ "$orig" = "$cur" ]; then
       echo ". $orig $cur $a"
     else
@@ -365,7 +365,7 @@ pkg_register_chksum() {
     echo "Is this an empty package?"
     return 1
   fi
-  ( cd ${DESTDIR}/${PREFIX}
+  ( cd ${DESTDIR}${PREFIX}
     for a in `cat $NFODIR/$PKGNAME/files` ; do
       ${CHKSUM} "$a"
     done
@@ -379,13 +379,13 @@ binpkg_register() {
   mkdir -p $NFODIR/$PKGNAME
   tar tzf $PKG | grep -v /$ | grep -v vdpm.nfo > $NFODIR/$PKGNAME/files
   pkg_register_chksum ${PKGNAME}
-  mv ${DESTDIR}/${PREFIX}/vdpm.nfo $NFODIR/$PKGNAME/vdpm.nfo
+  mv ${DESTDIR}${PREFIX}/vdpm.nfo $NFODIR/$PKGNAME/vdpm.nfo
   date > "$NFODIR/$PKGNAME/date"
 }
 
 binpkg_install() {
   echo "=> Installing binary package"
-  tar xzvf $PKG -C ${DESTDIR}/${PREFIX} | grep -v vdpm.nfo | grep -v /$
+  tar xzvf $PKG -C ${DESTDIR}${PREFIX} | grep -v vdpm.nfo | grep -v /$
   binpkg_register
 }
 
@@ -472,7 +472,7 @@ pkg_clean() {
 
 pkg_deinstall() {
   if [ -e "$NFODIR/$PKG/files" ]; then
-    cd "${DESTDIR}/${PREFIX}"
+    cd "${DESTDIR}${PREFIX}"
     for a in `cat $NFODIR/$PKG/files`; do
       [ -f "./$a" ] && echo "./$a" && rm -f "./$a"
     done
@@ -598,9 +598,9 @@ while [ -n "$1" ]; do
   -ri) remove_install "$2" ; exit 0 ; ;;
   -f) fixlibs ; exit 0 ; ;;
   -fi)
-    mkdir -p ${DESTDIR}/${PREFIX}/lib
+    mkdir -p ${DESTDIR}${PREFIX}/lib
     for a in `fixlibs` ; do
-      cp $a ${DESTDIR}/${PREFIX}/lib
+      cp $a ${DESTDIR}${PREFIX}/lib
       echo $(basename $a) >> ${NFODIR}/.fixedlibs
     done
     exit 0
@@ -609,7 +609,7 @@ while [ -n "$1" ]; do
   -fd)
     for a in $(cat ${NFODIR}/.fixedlibs) ; do
       echo $a
-      rm -f ${DESTDIR}/${PREFIX}/lib/$a
+      rm -f ${DESTDIR}${PREFIX}/lib/$a
     done
     :> ${NFODIR}/.fixedlibs
     exit 0
