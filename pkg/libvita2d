@@ -3,7 +3,7 @@ TYPE=git
 DESC="2D graphics library for the PS Vita"
 DEPS="libpng freetype"
 # support weird dir structure
-PRECONFIGURE="pushd libvita2d"
-POSTCONFIGURE="popd"
-PREINSTALL="pushd libvita2d"
-POSTINSTALL="popd"
+PRECONFIGURE="cd libvita2d"
+POSTCONFIGURE="cd -"
+PREINSTALL="cd libvita2d"
+POSTINSTALL="cd -"
