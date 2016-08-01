@@ -202,7 +202,7 @@ pkg_update() {
 
 pkg_patch() {
   if [ -n "${PATCHES}" ]; then
-    pushd ${WRKDIR}/${PKG}/${BASEDIR} > /dev/null
+    cd ${WRKDIR}/${PKG}/${BASEDIR} > /dev/null
     if [ -e .vdpm_patch_done ]; then
       echo "=> Patches already applied."
     else
@@ -212,13 +212,13 @@ pkg_patch() {
       done
       :> .vdpm_patch_done
     fi
-    popd > /dev/null
+    cd - > /dev/null
   fi
 }
 
 pkg_unpatch() {
   if [ -n "${PATCHES}" ]; then
-    pushd ${WRKDIR}/${PKG}/${BASEDIR} >/dev/null
+    cd ${WRKDIR}/${PKG}/${BASEDIR} >/dev/null
     if [ -e .vdpm_patch_done ]; then
       echo "=> Unpatching ${PKG}.."
       for a in ${PATCHES} ; do
@@ -228,7 +228,7 @@ pkg_unpatch() {
     else
       echo "=> Patches already not applied."
     fi
-    popd > /dev/null
+    cd - > /dev/null
   fi
 }
 
