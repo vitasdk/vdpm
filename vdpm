@@ -92,7 +92,7 @@ if [ $? = 0 ]; then
 else
 	CHKSUM=md5
 fi
-NFODIR="${DESTDIR}/${PREFIX}/share/vdpm/pkg"
+NFODIR="${DESTDIR}/${PREFIX}/var/vdpm/pkg"
 BINPKG=0
 if [ -n "${SYSDEPS}" ]; then
   igncmd="grep $(echo "-e$SYSDEPS" | sed -e 's, , -e,g')"
