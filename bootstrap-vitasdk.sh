@@ -40,7 +40,7 @@ if [ "${UNIX}" = true ]; then
     wget -O "vitasdk-nightly.tar.bz2" "https://bintray.com/vitasdk/vitasdk/download_file?file_path=vitasdk-${VITASDK_PLATFORM}-nightly-${VITASDK_VER}.tar.bz2"
     tar xf "vitasdk-nightly.tar.bz2" -C /usr/local/vitasdk --strip-components=1
 else
-    wget -O "vitasdk-nightly.zip" "https://bintray.com/vitasdk/vitasdk/download_file?file_path=vitasdk-${VITASDK_PLATFORM}-nightly-win32.zip"
+    wget -O "vitasdk-nightly.zip" "https://bintray.com/vitasdk/vitasdk/download_file?file_path=vitasdk-${VITASDK_VER}-nightly-win32.zip"
     7z x -o/usr/local/vitasdk vitasdk-nightly.zip
 fi
 
