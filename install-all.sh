@@ -9,3 +9,4 @@
 ./vdpm -i freetype
 ./vdpm -i sqlite
 ./vdpm -i fftw
+./vdpm -i libvita2d
