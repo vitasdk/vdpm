@@ -15,6 +15,9 @@ Getting started
 ---------------
 
 ### Mac & Linux
+First install cmake, you can get this from [Homebrew](http://brew.sh) on Mac (`brew install cmake`), 
+and from your distro's package manager on Linux (on ubuntu: `sudo apt-get install cmake`).
+
 ```shell
 git clone https://github.com/vitadev/vdpm
 cd ports

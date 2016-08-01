@@ -21,7 +21,7 @@ case "$(uname -s)" in
 
    MSYS*)
     UNIX=false
-    pacman -Syu --noconfirm make git wget p7zip tar
+    pacman -Syu --noconfirm make git wget p7zip tar cmake
     mkdir -p /usr/local/
    ;;
 
