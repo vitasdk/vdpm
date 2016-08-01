@@ -97,7 +97,7 @@ BINPKG=0
 if [ -n "${SYSDEPS}" ]; then
   igncmd="grep $(echo "-e$SYSDEPS" | sed -e 's, , -e,g')"
 else
-  igncmd="cat"
+  igncmd="true"
 fi
 export igncmd
 
