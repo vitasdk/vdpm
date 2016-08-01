@@ -252,8 +252,8 @@ pkg_build() {
         python setup.py build
         :> .vdpm_build_done
       else
-        if [ -f "CMakeLists.txt" -a ! -f "configure" ]; then
-          cmake .  -DCMAKE_INSTALL_PREFIX=${PREFIX} ${CMARGS}
+        if [ -f "CMakeLists.txt" ]; then
+          cmake .  -DCMAKE_INSTALL_PREFIX=${PREFIX} ${CMARGS} ${USER_CMARGS}
 	      else
           [ -f ${CONFIGURE} ] && chmod +x ${CONFIGURE}
           if [ -x "${CONFIGURE}" ]; then
@@ -705,7 +705,7 @@ pkg_open() {
   DEPS=""
   MAKEFUN=""
   CFGARGS="--host=arm-vita-eabi"
-  CMARGS="-DCMAKE_SYSTEM_NAME=Generic -DCMAKE_C_COMPILER=$CC -DCMAKE_CXX_COMPILER=$CXX -DCMAKE_RANLIB=$RANLIB -DCMAKE_AR=$AR -DCMAKE_FIND_ROOT_PATH=${VITASDK}/arm-vita-eabi -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER"
+  CMARGS="-DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_SYSTEM_NAME=Generic -DCMAKE_C_COMPILER=$CC -DCMAKE_CXX_COMPILER=$CXX -DCMAKE_RANLIB=$RANLIB -DCMAKE_AR=$AR -DCMAKE_FIND_ROOT_PATH=${VITASDK}/arm-vita-eabi -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER"
   BASEDIR=""
   PKGDIRNAME=""
   INSTALL_POST="" # script to run after install
