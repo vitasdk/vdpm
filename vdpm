@@ -443,6 +443,7 @@ pkg_register() {
     echo "=> Create binary package: ${BINPKGDIR}/vdpm-${PKG}.tgz"
     cp ${PKGDIR}/${PKG} vdpm.nfo
     tar czf ${BINPKGDIR}/vdpm-${PKG}.tgz *
+    tret=$?
     pkg_register_chksum ${PKG}
     ret=$?
   else
@@ -455,11 +456,13 @@ pkg_register() {
   if [ "$ret" = 1 ]; then
     echo "==> Error registering checksums for pkg ${PKGNAME}"
     exit 1
-  elif [ "$TRAVIS_OS_NAME" = "linux" ]; then
+  elif [ "$tret" = 0 ]; then
+    if [ "$TRAVIS_OS_NAME" = "linux" ]; then
     echo "=> Uploading vdpm-${PKG}.tgz to bintray..."
     BINTRAY_PKG_VER=$(printf %04d ${TRAVIS_BUILD_NUMBER})
     curl -T "${BINPKGDIR}/vdpm-${PKG}.tgz" -ujoshdekock:$BINTRAY_APIKEY "https://api.bintray.com/content/vitadev/dist/ports/${BINTRAY_PKG_VER}/vdpm-${PKG}.tgz?override=1"
     curl --request POST-ujoshdekock:$BINTRAY_APIKEY "https://api.bintray.com/content/vitadev/dist/ports/${BINTRAY_PKG_VER}/publish"
+    fi
   fi
 }
 
