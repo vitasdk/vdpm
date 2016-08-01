@@ -5,3 +5,4 @@ USER_CFGARGS="--disable-shared --enable-static --without-simd"
 PKGINSTALL="${MAKE} install-libLTLIBRARIES install-data-am"
 TARGET="PROGRAMS="
 CFLAGS="${CFLAGS} -std=c99 -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -ffast-math -ffat-lto-objects -flto"
+IGNORE_CMAKE=true
