@@ -252,7 +252,7 @@ pkg_build() {
         python setup.py build
         :> .vdpm_build_done
       else
-        if [ -f "CMakeLists.txt" ]; then
+        if [ -f "CMakeLists.txt" -a -z "${IGNORE_CMAKE}" ]; then
           cmake .  -DCMAKE_INSTALL_PREFIX=${PREFIX} ${CMARGS} ${USER_CMARGS}
 	      else
           [ -f ${CONFIGURE} ] && chmod +x ${CONFIGURE}
