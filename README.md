@@ -20,7 +20,7 @@ and from your distro's package manager on Linux (on ubuntu: `sudo apt-get instal
 
 ```shell
 git clone https://github.com/vitadev/vdpm
-cd ports
+cd vdpm
 cp config.sample config
 ./bootstrap-vitasdk.sh # skip this step if you already have vitasdk installed
                        # to /usr/local/vitasdk and have $VITASDK set
@@ -34,7 +34,7 @@ export PATH=$VITASDK/bin:$PATH # add vitasdk tool to $PATH if you havent already
 pacman -Syu
 pacman -S git
 git clone https://github.com/vitadev/vdpm
-cd ports
+cd vdpm
 cp config.sample config
 ./bootstrap-vitasdk.sh # skip this step if you already have vitasdk installed
                        # to /usr/local/vitasdk and have $VITASDK set
