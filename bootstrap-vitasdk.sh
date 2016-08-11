@@ -13,7 +13,7 @@ case "$(uname -s)" in
     VITASDK_PLATFORM=linux
     UNIX=true
     if [ -n "${TRAVIS}" ]; then
-        sudo apt-get install libc6-i386 lib32stdc++6 lib32gcc1
+        sudo apt-get install libc6-i386 lib32stdc++6 lib32gcc1 patch
     fi
     sudo mkdir -p /usr/local/vitasdk
     sudo chown $USER:$USER /usr/local/vitasdk
@@ -43,6 +43,8 @@ else
     wget -O "vitasdk-nightly.zip" "https://bintray.com/vitasdk/vitasdk/download_file?file_path=vitasdk-win32-nightly-${VITASDK_VER}.zip"
     7z x -o/usr/local/vitasdk vitasdk-nightly.zip
 fi
-
+echo "Please add the following to the bottom of your .bashrc:"
+echo "export VITASDK=/usr/local/vitasdk"
+echo "export PATH=$VITASDK/bin:$PATH"
 export VITASDK=/usr/local/vitasdk
 export PATH=$VITASDK/bin:$PATH
