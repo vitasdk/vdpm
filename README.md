@@ -74,6 +74,11 @@ Config
 
 It requires a config file. For most users `cp config.sample config` will work fine.
 
+Known Issues
+------------
+* The scripts that are used to install the required packages make use of [Wget](https://en.wikipedia.org/wiki/Wget) to download the required files. Some of the required files are downloaded from [SourceForge](https://sourceforge.net/) which redirects you to one of their mirror sites automatically. Wget handles this by default, however, if you (or your System Administrator) have a [Wget Startup File](https://www.gnu.org/software/wget/manual/html_node/Startup-File.html) in use it's possible to have settings in that file which will cause the downloads to fail, especially when using redirection from hosts such as SourceForge. If the installation isn't working for you and you notice that it's giving your errors about missing files try temporarily removing/renaming the Wget Startup File to see if that fixes the issue.
+
+
 Contributing
 ============
 
