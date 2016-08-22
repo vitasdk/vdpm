@@ -1,9 +1,15 @@
 #!/bin/sh
 
+get_version () {
+  # replace with '5\.4' if you want that version
+  GCCVER='4\.9'
+  curl "https://bintray.com/package/files/vitasdk/vitasdk/toolchain?order=desc&sort=fileLastModified&basePath=&tab=files" | egrep "\?file_path=vitasdk-gcc-$GCCVER-.*$1-.+\">" -ao | head -n1 | cut -d= -f2 | cut -d'"' -f1
+}
+
 case "$(uname -s)" in
    Darwin*)
     mkdir -p /usr/local/vitasdk
-    wget -O "vitasdk-nightly.tar.bz2" "https://bintray.com/vitasdk/vitasdk/download_file?file_path=vitasdk-mac-nightly-c86e2b4b45bd9cad07abbbcb208519b0357a639a.tar.bz2"
+    wget -O "vitasdk-nightly.tar.bz2" "https://bintray.com/vitasdk/vitasdk/download_file?file_path=$(get_version mac)"
     tar xf "vitasdk-nightly.tar.bz2" -C /usr/local/vitasdk --strip-components=1
    ;;
 
@@ -13,7 +19,7 @@ case "$(uname -s)" in
     fi
     sudo mkdir -p /usr/local/vitasdk
     sudo chown $USER:$USER /usr/local/vitasdk
-    wget -O "vitasdk-nightly.tar.bz2" "https://bintray.com/vitasdk/vitasdk/download_file?file_path=vitasdk-gcc-4.9-linux-compat-nightly-c5dd7f4051cdb0025a50acc343be863f724a1221.tar.bz2"
+    wget -O "vitasdk-nightly.tar.bz2" "https://bintray.com/vitasdk/vitasdk/download_file?file_path=$(get_version linux)"
     tar xf "vitasdk-nightly.tar.bz2" -C /usr/local/vitasdk --strip-components=1
    ;;
 
@@ -21,7 +27,7 @@ case "$(uname -s)" in
     UNIX=false
     pacman -Syu --noconfirm make git wget p7zip tar cmake
     mkdir -p /usr/local/
-    wget -O "vitasdk-nightly.zip" "https://bintray.com/vitasdk/vitasdk/download_file?file_path=vitasdk-gcc-4.9-win32-nightly-c5dd7f4051cdb0025a50acc343be863f724a1221.zip"
+    wget -O "vitasdk-nightly.zip" "https://bintray.com/vitasdk/vitasdk/download_file?file_path=$(get_version win32)"
     7z x -o/usr/local/vitasdk vitasdk-nightly.zip
    ;;
 
