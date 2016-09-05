@@ -25,3 +25,6 @@ script:
     - ./vdpm -i sqlite
     - ./vdpm -i fftw
     - ./vdpm -i libvita2d
+    - ./vdpm -i libmad
+    - ./vdpm -i libogg
+    - ./vdpm -i libvorbis
