@@ -1,0 +1,9 @@
+URL=https://github.com/xerpi/libftpvita
+TYPE=git
+DESC="FTP Server for the PSVita"
+DEPS=""
+# support weird dir structure
+PRECONFIGURE="cd libftpvita"
+POSTCONFIGURE="cd -"
+PREINSTALL="cd libftpvita"
+POSTINSTALL="cd -"
