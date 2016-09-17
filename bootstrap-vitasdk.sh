@@ -42,8 +42,10 @@ case "$(uname -s)" in
     ;;
 esac
 
+export VITASDK=/usr/local/vitasdk
+export PATH=$VITASDK/bin:$PATH
+
 echo "Please add the following to the bottom of your .bashrc:"
 echo "export VITASDK=/usr/local/vitasdk"
 echo "export PATH=$VITASDK/bin:$PATH"
-export VITASDK=/usr/local/vitasdk
-export PATH=$VITASDK/bin:$PATH
+
