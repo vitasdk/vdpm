@@ -5,7 +5,8 @@ DESTDIR=
 PREFIX="${VITASDK}/arm-vita-eabi"
 
 WGET="wget -c"
-REMOTE="https://bintray.com/vitadev/dist/download_file?file_path="
+REMOTE=
+#"https://bintray.com/vitadev/dist/download_file?file_path="
 
 CHROOTABLE=0
 DODEPS=1
