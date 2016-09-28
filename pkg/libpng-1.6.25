@@ -1,4 +1,4 @@
-URL=http://download.sourceforge.net/libpng/libpng-1.6.23.tar.gz
+URL=http://download.sourceforge.net/libpng/libpng-1.6.25.tar.gz
 DESC="PNG library"
 USER_CFGARGS="--disable-shared --enable-static --enable-arm-neon"
 DEPS="zlib"
