@@ -1,0 +1,4 @@
+URL=https://github.com/Cpasjuste/PSP2SHELL
+TYPE=git
+DESC="remote debugging shell library"
+CMARGS="-DCMAKE_TOOLCHAIN_FILE=Vita.cmake"
