@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 get_download_link () {
   curl "https://api.github.com/repos/vitasdk/autobuilds/releases" | grep "browser_download_url" | grep $1 | head -n 1 | cut -d '"' -f 4
