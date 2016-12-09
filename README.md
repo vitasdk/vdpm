@@ -26,8 +26,8 @@ cd vdpm
 cp config.sample config
 ./bootstrap-vitasdk.sh # skip this step if you already have vitasdk installed
                        # to /usr/local/vitasdk and have $VITASDK set
-export VITASDK=/usr/local/vitasdk # define $VITASDK if you havent already
-export PATH=$VITASDK/bin:$PATH # add vitasdk tool to $PATH if you havent already
+export VITASDK=/usr/local/vitasdk # define $VITASDK if you haven't already
+export PATH=$VITASDK/bin:$PATH # add vitasdk tool to $PATH if you haven't already
 ./install-all.sh
 ```
 
@@ -49,8 +49,8 @@ cd vdpm
 cp config.sample config
 ./bootstrap-vitasdk.sh # skip this step if you already have vitasdk installed
                        # to /usr/local/vitasdk and have $VITASDK set
-export VITASDK=/usr/local/vitasdk # define $VITASDK if you havent already
-export PATH=$VITASDK/bin:$PATH # add vitasdk tool to $PATH if you havent already
+export VITASDK=/usr/local/vitasdk # define $VITASDK if you haven't already
+export PATH=$VITASDK/bin:$PATH # add vitasdk tool to $PATH if you haven't already
 ./install-all.sh
 ```
 
