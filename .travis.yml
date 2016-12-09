@@ -3,9 +3,10 @@ os: linux
 language: c
 compiler: clang
 env:
-- VITASDK_VER=c86e2b4b45bd9cad07abbbcb208519b0357a639a
+- secure: "Om5m7w6SvYDLDP/TgOlgJDzkpoNXm01vF9z+gAsYBKFylEaxcci45MB6ybG6QHe9W8ohpy0Tvk75NqOKT6qEnWUQ87NoRDXDOE9M2C/DAQBO2vfScBg8JlnLkBlDQtHw+xKs5uZs+2aRI6h5xXoN86vDvVnHBBqCSXXyJQQ54K0MWcXcVZm2gjTHi8ftgfO3TUttNR8J4+W/Jo8YbNdnFdyrbXHHFcOYQ093tdF7rapKEwGML/6l25kl1ZC8RWPWFas5twlj30XjCKztt2tOPmEJMHYw7Yy4nmstAecbNMt9Zj+O6efaPO9yu9N+vRtjuX4HaRnOrNVMBIQ5DmSALg1XXY11I3rrLWn43A3588NfpmL91DI9ha/xB+iLnkw7EpU4lgRq1tCTZ5JcVe0eBvI8dHZmtixXa9POtHtFp/8uhJeE+cDonordYwanDR197GXQJLnwFKT/qvSU9uzFU2K7p6lRIv5hRtOCHFrOomfc7zahXm2E3YAEz4Tt5y2ru0YEBuicZR2uYTmXBxN8QDVqH7QJLTxVrWr6X6WQgdtxTgsRiVUV751O/Zbqy4fXGTWZwNuSU1ItqoAmmH5mQ83fKH2veA+x0T66oDHhIwRhBH8E9BEA+3pYmFC3a31ig6SvLRnt6T+hyBfdyUI61beenak/Opp2TAq0eKvn9tQ="
 
 before_install:
+    - sudo apt-get install sshpass
     - ./bootstrap-vitasdk.sh
     - export VITASDK=/usr/local/vitasdk
     - export PATH=$VITASDK/bin:$PATH
