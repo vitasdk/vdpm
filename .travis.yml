@@ -26,4 +26,3 @@ script:
     - ./vdpm -i libmad
     - ./vdpm -i libogg
     - ./vdpm -i libvorbis
-    - ./vdpm -i libpsp2shell
