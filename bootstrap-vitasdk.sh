@@ -31,7 +31,6 @@ case "$(uname -s)" in
 
    MSYS*)
     UNIX=false
-    pacman -Syu --noconfirm make git wget p7zip tar cmake
     mkdir -p $INSTALLDIR
     wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link win)"
     tar xf "vitasdk-nightly.tar.bz2" -C $INSTALLDIR --strip-components=1
