@@ -42,8 +42,8 @@ Read here for information on how to install Bash on Ubuntu on Windows: https://m
 For older versions of Windows, you should use msys2. Get it from here: https://msys2.github.io/. Only 64-bit version is supported.
 
 ```shell
-pacman -Syu
-pacman -S git
+# Read through https://msys2.github.io/ and make sure your msys2 is up-to-date first
+pacman -S make git wget p7zip tar cmake
 git clone https://github.com/vitadev/vdpm
 cd vdpm
 cp config.sample config
