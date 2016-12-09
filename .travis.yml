@@ -7,6 +7,7 @@ env:
 
 before_install:
     - sudo apt-get install sshpass
+    - echo "|1|319gPn4gbuUnAOPWNsRR1+PX6i0=|lrV+WR6nMUM7/hgPHEBzzDDogmI= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC8Z6HD2zR2C45TVnpAx8BaV96pK5RmITKCfl3yYxkTxrryLo8rhz/N6CPK1MgRv1iChZh7d1rrarLzMAcZq+B6pB5k1aieoOIIz3WpeWrRImcAK/D3ltN4gq4Uaccah48ojjD3o9MBTPqgM2tMyVdYRfwIlcMVH3tXoFax8/ISADkA6ZcoJcFCCriJmUVmLM/vypPXQPEnskxO3EepQCKvAtjFA0W4qoIyH7vV852HS8fLwRSI3YZfxcWmunqFo0fSnw97powGJxSN85SG2AQGib1aS9Tv/s52vDfW/0PHg04FMtPqDOBPn1fQi37ygFzWeWXetNhg6a9VTz94pgVJ" >> ~/.ssh/known_hosts
     - ./bootstrap-vitasdk.sh
     - export VITASDK=/usr/local/vitasdk
     - export PATH=$VITASDK/bin:$PATH
