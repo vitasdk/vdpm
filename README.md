@@ -31,7 +31,16 @@ export PATH=$VITASDK/bin:$PATH # add vitasdk tool to $PATH if you havent already
 ./install-all.sh
 ```
 
+### Windows (Bash on Ubuntu on Windows)
+
+Just follow the steps for Linux above. This is the recommended way to set up vdpm on Windows, however, it only works for Windows 10.
+
+Read here for information on how to install Bash on Ubuntu on Windows: https://msdn.microsoft.com/en-us/commandline/wsl/install_guide
+
 ### Windows (msys2)
+
+For older versions of Windows, you should use msys2. Get it from here: https://msys2.github.io/. Only 64-bit version is supported.
+
 ```shell
 pacman -Syu
 pacman -S git
