@@ -24,8 +24,7 @@ and from your distro's package manager on Linux (on ubuntu: `sudo apt-get instal
 git clone https://github.com/vitadev/vdpm
 cd vdpm
 cp config.sample config
-./bootstrap-vitasdk.sh # skip this step if you already have vitasdk installed
-                       # to /usr/local/vitasdk and have $VITASDK set
+./bootstrap-vitasdk.sh
 export VITASDK=/usr/local/vitasdk # define $VITASDK if you haven't already
 export PATH=$VITASDK/bin:$PATH # add vitasdk tool to $PATH if you haven't already
 ./install-all.sh
@@ -47,12 +46,16 @@ pacman -S make git wget p7zip tar cmake
 git clone https://github.com/vitadev/vdpm
 cd vdpm
 cp config.sample config
-./bootstrap-vitasdk.sh # skip this step if you already have vitasdk installed
-                       # to /usr/local/vitasdk and have $VITASDK set
+./bootstrap-vitasdk.sh
 export VITASDK=/usr/local/vitasdk # define $VITASDK if you haven't already
 export PATH=$VITASDK/bin:$PATH # add vitasdk tool to $PATH if you haven't already
 ./install-all.sh
 ```
+
+Update/reinstall
+----------------
+
+If you wish to obtain a newer copy of the SDK, you have to manually remove the `/usr/local/vitasdk` directory and then run the installer again.
 
 vdpm
 ----
