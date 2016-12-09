@@ -715,21 +715,16 @@ pkg_open() {
   if [ -n "${REMOTE}" ]; then
     here=$(pwd)
     cd ${BINPKGDIR}
-    eval ${WGET} ${REMOTE}vdpm-${PKG}.tgz -O vdpm-${PKG}.tgz
-    if [ $? = 0 ]; then
-      PKG=${BINPKGDIR}/vdpm-${PKG}.tgz
-    else
-      PKG2=`basename $PKGDIR/$PKG* 2> /dev/null` # autocomplete
-      if [ -f "$PKGDIR/$PKG2" ]; then
-        eval ${WGET} ${REMOTE}vdpm-${PKG2}.tgz -O vdpm-${PKG2}.tgz
-        if [ $? = 0 ]; then
-          PKG=${BINPKGDIR}/vdpm-${PKG2}.tgz
-        else
-          echo "=> Cannot find this package remotely"
-        fi
+    PKG2=`basename $PKGDIR/$PKG* 2> /dev/null` # autocomplete
+    if [ -f "$PKGDIR/$PKG2" ]; then
+      eval ${WGET} ${REMOTE}vdpm-${PKG2}.tgz -O vdpm-${PKG2}.tgz
+      if [ $? = 0 ]; then
+        PKG=${BINPKGDIR}/vdpm-${PKG2}.tgz
       else
         echo "=> Cannot find this package remotely"
       fi
+    else
+      echo "=> Cannot find this package remotely"
     fi
     cd ${here}
   fi

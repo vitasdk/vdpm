@@ -4,7 +4,7 @@
 PREFIX="${VITASDK}/arm-vita-eabi"
 DESTDIR=
 
-WGET="wget -c"
+WGET="wget"
 REMOTE=
 
 CHROOTABLE=0
