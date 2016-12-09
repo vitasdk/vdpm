@@ -1,34 +1,39 @@
 #!/bin/sh
 
-get_version () {
-  # replace with '5\.4' if you want that version
-  GCCVER='4\.9'
-  curl "https://bintray.com/package/files/vitasdk/vitasdk/toolchain?order=desc&sort=fileLastModified&basePath=&tab=files" | egrep "\?file_path=vitasdk-gcc-$GCCVER-.*$1-.+\">" -ao | head -n1 | cut -d= -f2 | cut -d'"' -f1
+get_download_link () {
+  curl "https://api.github.com/repos/vitasdk/autobuilds/releases" | grep "browser_download_url" | grep $1 | head -n 1 | cut -d '"' -f 4
 }
+
+INSTALLDIR="/usr/local/vitasdk"
+
+if [ -d "$INSTALLDIR" ]; then
+  echo "$INSTALLDIR already exists. Remove it first (e.g. 'sudo rm -rf $INSTALLDIR' or 'rm -rf $INSTALLDIR') and then restart this script"
+  exit 1
+fi
 
 case "$(uname -s)" in
    Darwin*)
-    mkdir -p /usr/local/vitasdk
-    wget -O "vitasdk-nightly.tar.bz2" "https://bintray.com/vitasdk/vitasdk/download_file?file_path=$(get_version mac)"
-    tar xf "vitasdk-nightly.tar.bz2" -C /usr/local/vitasdk --strip-components=1
+    mkdir -p $INSTALLDIR
+    wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link osx)"
+    tar xf "vitasdk-nightly.tar.bz2" -C $INSTALLDIR --strip-components=1
    ;;
 
    Linux*)
     if [ -n "${TRAVIS}" ]; then
         sudo apt-get install libc6-i386 lib32stdc++6 lib32gcc1 patch
     fi
-    sudo mkdir -p /usr/local/vitasdk
-    sudo chown $USER:$USER /usr/local/vitasdk
-    wget -O "vitasdk-nightly.tar.bz2" "https://bintray.com/vitasdk/vitasdk/download_file?file_path=$(get_version linux)"
-    tar xf "vitasdk-nightly.tar.bz2" -C /usr/local/vitasdk --strip-components=1
+    sudo mkdir -p $INSTALLDIR
+    sudo chown $USER:$USER $INSTALLDIR
+    wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link linux)"
+    tar xf "vitasdk-nightly.tar.bz2" -C $INSTALLDIR --strip-components=1
    ;;
 
    MSYS*)
     UNIX=false
     pacman -Syu --noconfirm make git wget p7zip tar cmake
-    mkdir -p /usr/local/
-    wget -O "vitasdk-nightly.zip" "https://bintray.com/vitasdk/vitasdk/download_file?file_path=$(get_version win32)"
-    7z x -o/usr/local/vitasdk vitasdk-nightly.zip
+    mkdir -p $INSTALLDIR
+    wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link win)"
+    tar xf "vitasdk-nightly.tar.bz2" -C $INSTALLDIR --strip-components=1
    ;;
 
    CYGWIN*|MINGW32*)
@@ -46,6 +51,6 @@ export VITASDK=/usr/local/vitasdk
 export PATH=$VITASDK/bin:$PATH
 
 echo "Please add the following to the bottom of your .bashrc:"
-echo "export VITASDK=/usr/local/vitasdk"
-echo "export PATH=$VITASDK/bin:$PATH"
-
+printf "\033[0;36m"'export VITASDK=/usr/local/vitasdk'"\033[0m\n"
+printf "\033[0;36m"'export PATH=$VITASDK/bin:$PATH'"\033[0m\n"
+echo "and then restart your terminal"
