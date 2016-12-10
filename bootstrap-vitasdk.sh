@@ -32,7 +32,7 @@ case "$(uname -s)" in
    MSYS*|MINGW64*)
     UNIX=false
     mkdir -p $INSTALLDIR
-    wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link win)"
+    wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link mingw32)"
     tar xf "vitasdk-nightly.tar.bz2" -C $INSTALLDIR --strip-components=1
    ;;
 
