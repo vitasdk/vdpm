@@ -22,8 +22,10 @@ script:
     - ./vdpm -i libexif
     - ./vdpm -i libjpeg
     - ./vdpm -i jansson
+    - ./vdpm -i freetype
     - ./vdpm -i sqlite
     - ./vdpm -i fftw
+    - ./vdpm -i libvita2d
     - ./vdpm -i libmad
     - ./vdpm -i libogg
     - ./vdpm -i libvorbis
