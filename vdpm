@@ -394,9 +394,6 @@ pkg_register() {
   cd "$WRKDIR/$PKG/${BASEDIR}"
   # TODO: move outside and create skel in a standard way
   mkdir -p "${TMPDIR}/${PKG}"
-  mkdir -p "${TMPDIR}/${PKG}/bin"
-  mkdir -p "${TMPDIR}/${PKG}/lib"
-  mkdir -p "${TMPDIR}/${PKG}/man/man1"
 ## XXX: dupped from pkg_install
     if [ -n "${PREINSTALL}" ]; then
       eval ${PREINSTALL}
@@ -406,7 +403,7 @@ pkg_register() {
       (cd "${TMPDIR}/${PKG}" ; eval $INSTALL_PRE)
     fi
   #PKGINSTALL_ARGS="DESTDIR=${DESTDIR} INSTALL_ROOT=${DESTDIR} PREFIX=${PREFIX} prefix=${PREFIX} exec_prefix=${PREFIX}"
-  PKGINSTALL_ARGS="PREFIX=/ DESTDIR=${TMPDIR}/${PKG} prefix=/ exec_prefix=${PREFIX}"
+  PKGINSTALL_ARGS="DESTDIR=${TMPDIR}/${PKG}"
   if [ -f setup.py ]; then
       ${PYTHON} setup.py install --root "${TMPDIR}/${PKG}" || exit 1
   else
@@ -417,7 +414,7 @@ pkg_register() {
     echo "=> Running ${PKGINSTALL} ${PKGINSTALL_ARGS}"
     DD="${TMPDIR}/${PKG}"
     eval DESTDIR=${DD} INSTALL_ROOT=${DD}  \
-      ${PKGINSTALL} PREFIX=/ "DESTDIR=${TMPDIR}/${PKG}" prefix=/ || exit 1
+      ${PKGINSTALL} "DESTDIR=${TMPDIR}/${PKG}" || exit 1
   fi
     #-if [ ! $? = 0 ]; then
     #-  echo "=> Install fail"
@@ -433,8 +430,7 @@ pkg_register() {
       eval ${POSTINSTALL}
     fi
   # go register
-  cd "${TMPDIR}/${PKG}"
-  echo "${TMPDIR}/${PKG}"
+  cd "${TMPDIR}/${PKG}/${PREFIX}"
   mkdir -p "$NFODIR/$PKG"
   if [ -n "`ls`" ]; then
     _pfx=`pwd | cut -c 2-`
