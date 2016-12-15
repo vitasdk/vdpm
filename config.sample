@@ -5,7 +5,7 @@ DESTDIR=
 PREFIX="${VITASDK}/arm-vita-eabi"
 
 WGET="wget"
-REMOTE="http://downloads.henkaku.xyz/"
+REMOTE="http://dl.vitasdk.org/"
 
 CHROOTABLE=0
 DODEPS=1
