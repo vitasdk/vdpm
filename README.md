@@ -23,7 +23,6 @@ and from your distro's package manager on Linux (on ubuntu: `sudo apt-get instal
 ```shell
 git clone https://github.com/vitasdk/vdpm
 cd vdpm
-cp config.sample config
 ./bootstrap-vitasdk.sh
 export VITASDK=/usr/local/vitasdk # define $VITASDK if you haven't already
 export PATH=$VITASDK/bin:$PATH # add vitasdk tool to $PATH if you haven't already
@@ -45,7 +44,6 @@ For older versions of Windows, you should use msys2. Get it from here: https://m
 pacman -S make git wget p7zip tar cmake
 git clone https://github.com/vitasdk/vdpm
 cd vdpm
-cp config.sample config
 ./bootstrap-vitasdk.sh
 export VITASDK=/usr/local/vitasdk # define $VITASDK if you haven't already
 export PATH=$VITASDK/bin:$PATH # add vitasdk tool to $PATH if you haven't already
@@ -57,35 +55,6 @@ Update/reinstall
 
 If you wish to obtain a newer copy of the SDK, you have to manually remove the `/usr/local/vitasdk` directory and then run the installer again.
 
-vdpm
-----
-
-vdpm helps with building libraries
-and software from their package description (in `pkg/*`).
-
-```
-Usage: vdpm [-iudlLx] [pkg pkg ..]
- -x : execute or enter into the vdpm shell
- -u : upgrade package
- -i : install package (.tgz or pkgname)
- -d : deinstall package
- -c : clean package (-ci to clean + install)
- -C : check checksum of pkg files (u=unmodified, m=modified)
- -r : remove devel/man/doc files to _remove/
-      -r: list, -ri: reinstall, -rm: remove
- -s : search package by keyword
- -l : list installed packages or pkg files
- -L : list all available packages (-LL for description)
- -f : find missing libraries
-      -fi: install, -fl: list, -fd: remove
- -p : patch package
- -P : unpatch package
-```
-
-Config
-------
-
-It requires a config file. For most users `cp config.sample config` will work fine.
 
 Known Issues
 ------------
