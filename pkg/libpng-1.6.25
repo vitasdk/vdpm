@@ -1,6 +1,0 @@
-URL=http://download.sourceforge.net/libpng/libpng-1.6.25.tar.gz
-DESC="PNG library"
-USER_CFGARGS="--disable-shared --enable-static --enable-arm-neon"
-DEPS="zlib"
-CFLAGS="${CFLAGS} -std=c99 -ftree-vectorize -mword-relocations -fomit-frame-pointer -ffast-math -DPNG_NO_CONSOLE_IO -ffat-lto-objects -flto"
-IGNORE_CMAKE=true

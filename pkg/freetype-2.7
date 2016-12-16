@@ -1,7 +1,0 @@
-URL=http://downloads.sourceforge.net/project/freetype/freetype2/2.7/freetype-2.7.tar.gz
-DESC=FreeType
-TYPE=tar
-USER_CFGARGS="--disable-shared --enable-static --without-harfbuzz --without-bzip2"
-USER_CMARGS="-DWITH_ZLIB=ON -DWITH_BZip2=OFF -DWITH_PNG=ON -DWITH_HarfBuzz=OFF"
-CFLAGS="${CFLAGS} -std=c99 -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -ffast-math -ffat-lto-objects -flto"
-PATCHES="freetype-2.7-cmake"

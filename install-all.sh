@@ -1,12 +1,20 @@
 #!/bin/bash
 
-# install all
-./vdpm -i zlib
-./vdpm -i libpng
-./vdpm -i libexif
-./vdpm -i libjpeg
-./vdpm -i jansson
-./vdpm -i freetype
-./vdpm -i sqlite
-./vdpm -i fftw
-./vdpm -i libvita2d
+set -e
+
+b() {
+	./vdpm $1
+}
+
+b zlib
+b libpng
+b libexif
+b libjpeg-turbo
+b jansson
+b freetype
+b fftw
+b libvita2d
+b libmad
+b libogg
+b libvorbis
+b libftpvita

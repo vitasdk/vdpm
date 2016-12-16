@@ -1,9 +1,0 @@
-URL=http://download.sourceforge.net/mad/libmad-0.15.1b.tar.gz
-DESC="MAD library"
-USER_CFGARGS="--disable-shared --enable-static"
-DEPS=""
-CFLAGS="${CFLAGS} -DHAVE_CONFIG_H -DHAVE_SYS_TYPES_H -DHAVE_ERRNO_H -DHAVE_UNISTD_H -DHAVE_FCNTL_H \
-	-ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -ffast-math \
-	-march=armv7-a -mtune=cortex-a9 -mfpu=neon -mfloat-abi=hard"
-IGNORE_CMAKE=true
-PATCHES="libmad-0.15.1b-Provide-Thumb-2-alternative-code-for-MAD_F_MLN"

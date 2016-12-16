@@ -1,7 +1,0 @@
-URL=http://downloads.xiph.org/releases/vorbis/libvorbis-1.3.5.tar.gz
-DESC="Vorbis library"
-USER_CFGARGS="--disable-shared --enable-static"
-DEPS=""
-CFLAGS="${CFLAGS} -ftree-vectorize -O3 -mword-relocations -fomit-frame-pointer -ffast-math \
-	-march=armv7-a -mtune=cortex-a9 -mfpu=neon -mfloat-abi=hard"
-IGNORE_CMAKE=true

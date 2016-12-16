@@ -97,25 +97,6 @@ Contributing
 
 Contributions are welcome to both the package repo, documentation or the package manager itself.
 
-Packages
---------
-
-The format for packages are as follows.
-
-```shell
-# required
-URL=http://example.com/testpkg-0.3.2.tar.gz # direct source url
-TYPE=tar # tar/git
-DESC="a test package for vdpm" # short description for the package
-# optional
-TARGET="libtest.a" # custom target for make
-PKGINSTALL="${MAKE} install-libtest.a" # custom install command
-USER_CFGARGS="--disable-shared --disable-threadsafe" # configure arguments
-CFLAGS="${CFLAGS} -O3" # CFLAGS (must include ${CFLAGS} unless the intention is to replace computed CFLAGS)
-```
-
-They need to be placed in `pkg/` with their filename matching the extracted folder/git clone folder of the source.
-
 License
 -------
 LGPL v2.1 or later.

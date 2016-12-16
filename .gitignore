@@ -1,5 +1,1 @@
-config
-.DS_Store
-*~
-_*
-binpkg
+vitasdk-nightly.*
