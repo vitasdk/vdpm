@@ -18,3 +18,11 @@ b libmad
 b libogg
 b libvorbis
 b libftpvita
+b henkaku
+b taihen
+b onigmo
+b sdl2
+b openssl
+b curl
+b expat
+b opus
