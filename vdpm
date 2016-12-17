@@ -15,7 +15,11 @@ error() {
 
 install_pkg() {
   echo "Installing $1..."
-  curl http://dl.vitasdk.org/$1.tar.xz | tar -C $VITASDK/arm-vita-eabi -Jxvf -
+  if [ -f $1 ]; then
+    tar -C $VITASDK/arm-vita-eabi -Jxvf $1
+  else
+    curl http://dl.vitasdk.org/$1.tar.xz | tar -C $VITASDK/arm-vita-eabi -Jxvf -
+  fi
   echo "success"
 }
 
