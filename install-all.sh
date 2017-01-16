@@ -17,10 +17,10 @@ b libvita2d
 b libmad
 b libogg
 b libvorbis
-b libpsp2shell
 b libftpvita
 b henkaku
 b taihen
+b libpsp2shell
 b onigmo
 b sdl2
 b sdl_mixer
