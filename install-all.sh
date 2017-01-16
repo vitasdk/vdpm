@@ -20,6 +20,7 @@ b libvorbis
 b libftpvita
 b henkaku
 b taihen
+b libk
 b libpsp2shell
 b onigmo
 b sdl2
