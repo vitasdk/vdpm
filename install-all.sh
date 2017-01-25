@@ -34,3 +34,4 @@ b curl
 b expat
 b opus
 b glm
+b libxml2
