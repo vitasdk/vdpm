@@ -37,3 +37,4 @@ b opus
 b unrar
 b glm
 b libxml2
+b speexdsp
