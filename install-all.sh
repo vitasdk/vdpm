@@ -40,3 +40,4 @@ b libxml2
 b kuio
 b speexdsp
 b pixman
+b mpg123
