@@ -39,3 +39,4 @@ b glm
 b libxml2
 b speexdsp
 b pixman
+b mpg123
