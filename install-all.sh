@@ -38,3 +38,5 @@ b unrar
 b glm
 b libxml2
 b kuio
+b speexdsp
+b pixman
