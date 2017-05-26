@@ -7,6 +7,7 @@ b() {
 }
 
 b zlib
+b bzip2
 b libpng
 b libexif
 b libjpeg-turbo
