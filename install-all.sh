@@ -7,7 +7,6 @@ b() {
 }
 
 b zlib
-b bzip2
 b libpng
 b libexif
 b libjpeg-turbo
@@ -27,8 +26,8 @@ b libpsp2shell
 b libdebugnet
 b onigmo
 b sdl2
-b sdl_mixer
 b sdl_image
+b sdl_mixer
 b sdl_net
 b sdl_ttf
 b openssl
@@ -38,7 +37,5 @@ b opus
 b unrar
 b glm
 b libxml2
-b kuio
 b speexdsp
 b pixman
-b mpg123
