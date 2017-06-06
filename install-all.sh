@@ -38,3 +38,5 @@ b glm
 b libxml2
 b speexdsp
 b pixman
+b kuio
+b mpg123
