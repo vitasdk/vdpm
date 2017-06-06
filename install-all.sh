@@ -22,7 +22,6 @@ b libftpvita
 b henkaku
 b taihen
 b libk
-b libpsp2shell
 b libdebugnet
 b onigmo
 b sdl2
