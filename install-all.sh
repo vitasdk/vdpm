@@ -7,6 +7,7 @@ b() {
 }
 
 b zlib
+b bzip2
 b libpng
 b libexif
 b libjpeg-turbo
@@ -38,3 +39,6 @@ b glm
 b libxml2
 b speexdsp
 b pixman
+b TinyGL
+b kuio
+b mpg123
