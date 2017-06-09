@@ -8,6 +8,7 @@ b() {
 
 b zlib
 b bzip2
+b libzip
 b libpng
 b libexif
 b libjpeg-turbo
@@ -29,7 +30,7 @@ b sdl2
 b sdl_image
 b sdl_mixer
 b sdl_net
-b sdl_ttf
+b SDL_ttf
 b openssl
 b curl
 b expat
