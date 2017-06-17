@@ -42,4 +42,5 @@ b speexdsp
 b pixman
 b TinyGL
 b kuio
+b taipool
 b mpg123
