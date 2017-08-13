@@ -46,3 +46,4 @@ b kuio
 b taipool
 b mpg123
 b soloud
+b quirc
