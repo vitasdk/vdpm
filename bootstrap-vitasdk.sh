@@ -24,7 +24,7 @@ case "$(uname -s)" in
         sudo apt-get install libc6-i386 lib32stdc++6 lib32gcc1 patch
     fi
     sudo mkdir -p $INSTALLDIR
-    sudo chown $USER:$USER $INSTALLDIR
+    sudo chown $USER:$(id -gn $USER) $INSTALLDIR
     wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link linux)"
     tar xf "vitasdk-nightly.tar.bz2" -C $INSTALLDIR --strip-components=1
    ;;
