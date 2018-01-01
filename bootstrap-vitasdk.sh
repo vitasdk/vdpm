@@ -8,7 +8,7 @@ get_download_link () {
 INSTALLDIR="/usr/local/vitasdk"
 
 if [ -d "$INSTALLDIR" ]; then
-  echo "$INSTALLDIR already exists. Remove it first (e.g. 'sudo rm -rf $INSTALLDIR' or 'rm -rf $INSTALLDIR') and then restart this script"
+  echo "$INSTALLDIR already exists. Remove it first (e.g. 'rm -rf $INSTALLDIR' or 'rm -rf $INSTALLDIR') and then restart this script"
   exit 1
 fi
 
@@ -21,10 +21,10 @@ case "$(uname -s)" in
 
    Linux*)
     if [ -n "${TRAVIS}" ]; then
-        sudo apt-get install libc6-i386 lib32stdc++6 lib32gcc1 patch
+        apt-get install libc6-i386 lib32stdc++6 lib32gcc1 patch
     fi
-    sudo mkdir -p $INSTALLDIR
-    sudo chown $USER:$(id -gn $USER) $INSTALLDIR
+    mkdir -p $INSTALLDIR
+    chown $USER:$(id -gn $USER) $INSTALLDIR
     wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link linux)"
     tar xf "vitasdk-nightly.tar.bz2" -C $INSTALLDIR --strip-components=1
    ;;
