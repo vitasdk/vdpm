@@ -5,7 +5,7 @@ get_download_link () {
   curl "https://api.github.com/repos/vitasdk/autobuilds/releases" | grep "browser_download_url" | grep $1 | head -n 1 | cut -d '"' -f 4
 }
 
-INSTALLDIR="/usr/local/vitasdk"
+INSTALLDIR="${VITASDK:-/usr/local/vitasdk}"
 
 if [ -d "$INSTALLDIR" ]; then
   echo "$INSTALLDIR already exists. Remove it first (e.g. 'sudo rm -rf $INSTALLDIR' or 'rm -rf $INSTALLDIR') and then restart this script"
@@ -48,6 +48,6 @@ case "$(uname -s)" in
 esac
 
 echo "Please add the following to the bottom of your .bashrc:"
-printf "\033[0;36m"'export VITASDK=/usr/local/vitasdk'"\033[0m\n"
+printf "\033[0;36m""export VITASDK=${INSTALLDIR}""\033[0m\n"
 printf "\033[0;36m"'export PATH=$VITASDK/bin:$PATH'"\033[0m\n"
 echo "and then restart your terminal"
