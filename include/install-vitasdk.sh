@@ -12,6 +12,7 @@ install_vitasdk () {
       mkdir -p $INSTALLDIR
       wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link osx)"
       tar xf "vitasdk-nightly.tar.bz2" -C $INSTALLDIR --strip-components=1
+      rm -f "vitasdk-nightly.tar.bz2"
      ;;
 
      Linux*)
@@ -24,6 +25,7 @@ install_vitasdk () {
       fi
       wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link linux)"
       tar xf "vitasdk-nightly.tar.bz2" -C $INSTALLDIR --strip-components=1
+      rm -f "vitasdk-nightly.tar.bz2"
      ;;
 
      MSYS*|MINGW64*)
@@ -31,6 +33,7 @@ install_vitasdk () {
       mkdir -p $INSTALLDIR
       wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link mingw32)"
       tar xf "vitasdk-nightly.tar.bz2" -C $INSTALLDIR --strip-components=1
+      rm -f "vitasdk-nightly.tar.bz2"
      ;;
 
      CYGWIN*|MINGW32*)
