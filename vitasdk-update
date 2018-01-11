@@ -1,0 +1,22 @@
+#!/bin/bash
+
+set -e
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+
+if [ -z "$VITASDK" ]; then
+  echo '$VITASDK is not set'
+  exit 1
+fi
+
+. $DIR/include/install-vitasdk.sh
+. $DIR/include/install-packages.sh
+
+echo "==> Updating vitasdk"
+install_vitasdk $VITASDK
+
+echo "==> Updating packages"
+install_packages
+
+echo "All done!"
