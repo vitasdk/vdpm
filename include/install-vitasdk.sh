@@ -9,6 +9,9 @@ install_vitasdk () {
 
   case "$(uname -s)" in
      Darwin*)
+      if [ -d "$INSTALLDIR" ]; then
+          rm -rf $INSTALLDIR
+      fi
       mkdir -p $INSTALLDIR
       wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link osx)"
       tar xf "vitasdk-nightly.tar.bz2" -C $INSTALLDIR --strip-components=1
@@ -19,10 +22,11 @@ install_vitasdk () {
       if [ -n "${TRAVIS}" ]; then
           sudo apt-get install libc6-i386 lib32stdc++6 lib32gcc1 patch
       fi
-      if [ ! -d "$INSTALLDIR" ]; then
-        sudo mkdir -p $INSTALLDIR
-        sudo chown $USER:$(id -gn $USER) $INSTALLDIR
+      if [ -d "$INSTALLDIR" ]; then
+          sudo rm -rf $INSTALLDIR
       fi
+      sudo mkdir -p $INSTALLDIR
+      sudo chown $USER:$(id -gn $USER) $INSTALLDIR
       wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link linux)"
       tar xf "vitasdk-nightly.tar.bz2" -C $INSTALLDIR --strip-components=1
       rm -f "vitasdk-nightly.tar.bz2"
@@ -30,6 +34,9 @@ install_vitasdk () {
 
      MSYS*|MINGW64*)
       UNIX=false
+      if [ -d "$INSTALLDIR" ]; then
+          rm -rf $INSTALLDIR
+      fi
       mkdir -p $INSTALLDIR
       wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link mingw32)"
       tar xf "vitasdk-nightly.tar.bz2" -C $INSTALLDIR --strip-components=1
