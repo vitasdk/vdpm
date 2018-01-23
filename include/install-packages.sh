@@ -60,4 +60,5 @@ install_packages() {
 	b libsndfile
 	b xz
 	b libarchive
+	b bullet
 }
