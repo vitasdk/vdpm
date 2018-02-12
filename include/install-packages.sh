@@ -21,6 +21,7 @@ install_packages() {
 	b harfbuzz
 	b fftw
 	b libvita2d
+	b libvita2d_ext
 	b libmad
 	b libogg
 	b libvorbis
