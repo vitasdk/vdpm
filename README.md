@@ -53,7 +53,7 @@ export PATH=$VITASDK/bin:$PATH # add vitasdk tool to $PATH if you haven't alread
 Update/reinstall
 ----------------
 
-If you wish to obtain a newer copy of the SDK, you have to manually remove the `/usr/local/vitasdk` directory and then run the installer again.
+Run `./vitasdk-update` which will replace files in `$VITASDK` with the latest nightly and libraries.
 
 
 Known Issues
