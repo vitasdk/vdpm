@@ -62,4 +62,5 @@ install_packages() {
 	b xz
 	b libarchive
 	b bullet
+	b libimagequant
 }
