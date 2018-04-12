@@ -63,4 +63,5 @@ install_packages() {
 	b libarchive
 	b bullet
 	b libimagequant
+	b libmodplug
 }
