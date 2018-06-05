@@ -14,7 +14,7 @@ Usage
 Getting started
 ---------------
 
-**You should make sure you have the `patch` command installed.**
+**You should make sure you have the `patch` and `curl` commands installed.**
 
 ### Mac & Linux
 First install cmake, you can get this from [Homebrew](http://brew.sh) on Mac (`brew install cmake`), 
