@@ -44,6 +44,7 @@ install_packages() {
 	b sdl2_ttf
 	b openssl
 	b curl
+	b curlpp
 	b expat
 	b opus
 	b unrar
