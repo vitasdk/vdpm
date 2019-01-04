@@ -65,4 +65,6 @@ install_packages() {
 	b bullet
 	b libimagequant
 	b libmodplug
+	b libmikmod
+	b flac
 }
