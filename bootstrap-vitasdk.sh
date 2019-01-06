@@ -7,11 +7,6 @@ INSTALLDIR="${VITASDK:-/usr/local/vitasdk}"
 
 . $DIR/include/install-vitasdk.sh
 
-if [ -d "$INSTALLDIR" ]; then
-  echo "$INSTALLDIR already exists. Remove it first (e.g. 'sudo rm -rf $INSTALLDIR' or 'rm -rf $INSTALLDIR') and then restart this script"
-  exit 1
-fi
-
 echo "==> Installing vitasdk to $INSTALLDIR"
 install_vitasdk $INSTALLDIR
 
