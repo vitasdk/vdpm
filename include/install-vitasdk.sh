@@ -1,7 +1,9 @@
 #!/bin/bash
 
 get_download_link () {
-  curl "https://api.github.com/repos/vitasdk/autobuilds/releases" | grep "master" | grep "browser_download_url" | grep $1 | head -n 1 | cut -d '"' -f 4
+  wget -O "releases.json" "https://api.github.com/repos/vitasdk/autobuilds/releases"
+  grep "master" "releases.json" | grep "browser_download_url" | grep $1 | head -n 1 | cut -d '"' -f 4
+  rm -f "releases.json"
 }
 
 install_vitasdk () {
