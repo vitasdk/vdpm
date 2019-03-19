@@ -1,7 +1,7 @@
 #!/bin/bash
 
 get_download_link () {
-  curl "https://api.github.com/repos/vitasdk/autobuilds/releases" | grep "master" | grep "browser_download_url" | grep $1 | head -n 1 | cut -d '"' -f 4
+  curl -sL https://github.com/vitasdk/vita-headers/raw/master/.travis.d/last_built_toolchain.py | python - $@
 }
 
 install_vitasdk () {
@@ -10,7 +10,7 @@ install_vitasdk () {
   case "$(uname -s)" in
      Darwin*)
       mkdir -p $INSTALLDIR
-      wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link osx)"
+      wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link master osx)"
       tar xf "vitasdk-nightly.tar.bz2" -C $INSTALLDIR --strip-components=1
       rm -f "vitasdk-nightly.tar.bz2"
      ;;
@@ -23,7 +23,7 @@ install_vitasdk () {
         sudo mkdir -p $INSTALLDIR
         sudo chown $USER:$(id -gn $USER) $INSTALLDIR
       fi
-      wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link linux)"
+      wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link master linux)"
       tar xf "vitasdk-nightly.tar.bz2" -C $INSTALLDIR --strip-components=1
       rm -f "vitasdk-nightly.tar.bz2"
      ;;
@@ -31,7 +31,7 @@ install_vitasdk () {
      MSYS*|MINGW64*)
       UNIX=false
       mkdir -p $INSTALLDIR
-      wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link mingw32)"
+      wget -O "vitasdk-nightly.tar.bz2" "$(get_download_link master win)"
       tar xf "vitasdk-nightly.tar.bz2" -C $INSTALLDIR --strip-components=1
       rm -f "vitasdk-nightly.tar.bz2"
      ;;
