@@ -67,4 +67,6 @@ install_packages() {
 	b libmodplug
 	b libmikmod
 	b flac
+	b SDL2_gfx
+	b SDL_gfx
 }
