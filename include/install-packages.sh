@@ -69,4 +69,5 @@ install_packages() {
 	b flac
 	b SDL2_gfx
 	b SDL_gfx
+	b libconfig
 }
