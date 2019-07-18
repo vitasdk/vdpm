@@ -5,7 +5,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 INSTALLDIR="${VITASDK:-/usr/local/vitasdk}"
 
-. $DIR/include/install-vitasdk.sh
+. "$DIR/include/install-vitasdk.sh"
 
 if [ -d "$INSTALLDIR" ]; then
   echo "$INSTALLDIR already exists. Remove it first (e.g. 'sudo rm -rf $INSTALLDIR' or 'rm -rf $INSTALLDIR') and then restart this script"
