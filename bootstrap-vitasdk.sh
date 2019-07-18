@@ -5,7 +5,13 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 INSTALLDIR="${VITASDK:-/usr/local/vitasdk}"
 
-. $DIR/include/install-vitasdk.sh
+fallback_fail() {
+  echo "FAIL: removing $INSTALLDIR"
+  sudo rm -rf $INSTALLDIR
+  exit 1
+}
+
+. "$DIR/include/install-vitasdk.sh"
 
 if [ -d "$INSTALLDIR" ]; then
   echo "$INSTALLDIR already exists. Remove it first (e.g. 'sudo rm -rf $INSTALLDIR' or 'rm -rf $INSTALLDIR') and then restart this script"
@@ -13,7 +19,7 @@ if [ -d "$INSTALLDIR" ]; then
 fi
 
 echo "==> Installing vitasdk to $INSTALLDIR"
-install_vitasdk $INSTALLDIR
+install_vitasdk $INSTALLDIR || fallback_fail
 
 echo "Please add the following to the bottom of your .bashrc:"
 printf "\033[0;36m""export VITASDK=${INSTALLDIR}""\033[0m\n"
