@@ -10,8 +10,8 @@ if [ -z "$VITASDK" ]; then
   exit 1
 fi
 
-. $DIR/include/install-vitasdk.sh
-. $DIR/include/install-packages.sh
+. "$DIR/include/install-vitasdk.sh"
+. "$DIR/include/install-packages.sh"
 
 echo "==> Updating vitasdk"
 install_vitasdk $VITASDK
