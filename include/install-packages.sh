@@ -5,7 +5,7 @@ set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 b() {
-	$DIR/../vdpm $1
+	"$DIR/../vdpm" $1
 }
 
 install_packages() {
