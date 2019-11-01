@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # vitasdk package manager
 # (aka a 5 liner around tar and curl)
