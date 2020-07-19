@@ -25,7 +25,9 @@ install_packages() {
 	b libmad
 	b libogg
 	b libvorbis
+	b flac
 	b libtremor
+	b libmikmod
 	b libftpvita
 	b henkaku
 	b taihen
@@ -37,11 +39,14 @@ install_packages() {
 	b sdl_mixer
 	b sdl_net
 	b sdl_ttf
+	n sdl_gfx
 	b sdl2
 	b sdl2_image
 	b sdl2_mixer
 	b sdl2_net
 	b sdl2_ttf
+	b sdl2_gfx
+	b openal-soft
 	b openssl
 	b curl
 	b curlpp
@@ -56,6 +61,7 @@ install_packages() {
 	b kuio
 	b taipool
 	b mpg123
+	b libmpeg2
 	b soloud
 	b quirc
 	b Box2D
@@ -65,9 +71,15 @@ install_packages() {
 	b bullet
 	b libimagequant
 	b libmodplug
-	b libmikmod
-	b flac
-	b SDL2_gfx
-	b SDL_gfx
 	b libconfig
+	b libsodium
+	b vitaShaRK
+	b libmathneon
+	b vitaGL
+	b imgui
+	b libbaremetal
+	b minizip
+	b jsoncpp
+	b lame
+	b fmmpeg
 }
