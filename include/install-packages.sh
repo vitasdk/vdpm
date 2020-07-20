@@ -39,7 +39,7 @@ install_packages() {
 	b sdl_mixer
 	b sdl_net
 	b sdl_ttf
-	n sdl_gfx
+	b sdl_gfx
 	b sdl2
 	b sdl2_image
 	b sdl2_mixer
