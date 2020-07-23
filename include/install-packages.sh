@@ -81,5 +81,5 @@ install_packages() {
 	b minizip
 	b jsoncpp
 	b lame
-	b fmmpeg
+	b ffmpeg
 }
