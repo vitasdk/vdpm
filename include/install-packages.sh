@@ -31,9 +31,11 @@ install_packages() {
 	b libftpvita
 	b henkaku
 	b taihen
+	b kubridge
 	b libk
 	b libdebugnet
 	b onigmo
+	b libwebp
 	b sdl
 	b sdl_image
 	b sdl_mixer
@@ -52,6 +54,7 @@ install_packages() {
 	b curlpp
 	b expat
 	b opus
+	b opusfile
 	b unrar
 	b glm
 	b libxml2
@@ -77,9 +80,11 @@ install_packages() {
 	b libmathneon
 	b vitaGL
 	b imgui
+	b imgui-vita2d
 	b libbaremetal
 	b minizip
 	b jsoncpp
 	b lame
 	b ffmpeg
+	b physfs
 }
