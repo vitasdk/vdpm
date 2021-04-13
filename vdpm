@@ -7,31 +7,67 @@
 set -e
 set -o errtrace
 
+CLEAN=0
+
 error() {
   echo ""
   echo "Failed to install, the package probably does not exist."
   exit 1
 }
 
+write_success() {
+  touch /tmp/vdpm_install_$1
+}
+
 install_pkg() {
-  echo "Installing $1..."
-  if [ -f $1 ]; then
-    tar -C $VITASDK/arm-vita-eabi -Jxvf $1
+  if [ $CLEAN -eq 1 ]; then
+    echo "cleaning old confirmation files"
+    clean_tmp_file
   else
-    curl http://dl.vitasdk.org/$1.tar.xz | tar -C $VITASDK/arm-vita-eabi -Jxvf -
+    if [ $(find "/tmp/vdpm_install_$1" -cmin -1440 -print) ]; then
+      echo "skip install $1. Package previously installed less than one day ago"
+    else
+      echo "Installing $1..."
+      if [ -f $1 ]; then
+        tar -C $VITASDK/arm-vita-eabi -Jxvf $1
+      else
+        curl http://dl.vitasdk.org/$1.tar.xz | tar -C $VITASDK/arm-vita-eabi -Jxvf -
+        write_success $1
+      fi
+      echo "success"
+    fi
   fi
-  echo "success"
+}
+
+clean_tmp_file() {
+  rm -rf /tmp/vdpm_install_*
+}
+
+helpmenu() {
+  echo "Usage: ./vdpm package-name"
+  exit 1
 }
 
 if [ "$#" -ne 1 ]; then
-    echo "Usage: ./vdpm package-name"
-    exit 1
+  helpmenu
 fi
 
 if [ -z "$VITASDK" ]; then
   echo '$VITASDK is not set'
   exit 1
 fi
+
+while getopts "hc" opt; do
+  case ${opt} in
+    h ) helpmenu
+        exit 0
+        ;;
+    c )
+    CLEAN=1
+    shift
+    ;;
+  esac
+done
 
 trap 'error' ERR
 install_pkg $1
