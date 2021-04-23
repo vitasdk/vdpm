@@ -4,87 +4,94 @@ set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+PACKAGES=(
+	zlib
+	bzip2
+	libzip
+	libpng
+	libexif
+	libjpeg-turbo
+	jansson
+	yaml-cpp
+	freetype
+	harfbuzz
+	fftw
+	libvita2d
+	libvita2d_ext
+	libmad
+	libogg
+	libvorbis
+	flac
+	libtremor
+	libmikmod
+	libftpvita
+	henkaku
+	taihen
+	kubridge
+	libk
+	libdebugnet
+	onigmo
+	libwebp
+	sdl
+	sdl_image
+	sdl_mixer
+	sdl_net
+	sdl_ttf
+	sdl_gfx
+	sdl2
+	sdl2_image
+	sdl2_mixer
+	sdl2_net
+	sdl2_ttf
+	sdl2_gfx
+	openal-soft
+	openssl
+	curl
+	curlpp
+	expat
+	opus
+	opusfile
+	unrar
+	glm
+	libxml2
+	speexdsp
+	pixman
+	TinyGL
+	kuio
+	taipool
+	mpg123
+	libmpeg2
+	soloud
+	quirc
+	Box2D
+	libsndfile
+	xz
+	libarchive
+	bullet
+	libimagequant
+	libmodplug
+	libconfig
+	libsodium
+	vitaShaRK
+	libmathneon
+	vitaGL
+	imgui
+	imgui-vita2d
+	libbaremetal
+	minizip
+	jsoncpp
+	lame
+	ffmpeg
+	physfs
+)
+
 b() {
 	$DIR/../vdpm $1
 }
 
 install_packages() {
-	b zlib
-	b bzip2
-	b libzip
-	b libpng
-	b libexif
-	b libjpeg-turbo
-	b jansson
-	b yaml-cpp
-	b freetype
-	b harfbuzz
-	b fftw
-	b libvita2d
-	b libvita2d_ext
-	b libmad
-	b libogg
-	b libvorbis
-	b flac
-	b libtremor
-	b libmikmod
-	b libftpvita
-	b henkaku
-	b taihen
-	b kubridge
-	b libk
-	b libdebugnet
-	b onigmo
-	b libwebp
-	b sdl
-	b sdl_image
-	b sdl_mixer
-	b sdl_net
-	b sdl_ttf
-	b sdl_gfx
-	b sdl2
-	b sdl2_image
-	b sdl2_mixer
-	b sdl2_net
-	b sdl2_ttf
-	b sdl2_gfx
-	b openal-soft
-	b openssl
-	b curl
-	b curlpp
-	b expat
-	b opus
-	b opusfile
-	b unrar
-	b glm
-	b libxml2
-	b speexdsp
-	b pixman
-	b TinyGL
-	b kuio
-	b taipool
-	b mpg123
-	b libmpeg2
-	b soloud
-	b quirc
-	b Box2D
-	b libsndfile
-	b xz
-	b libarchive
-	b bullet
-	b libimagequant
-	b libmodplug
-	b libconfig
-	b libsodium
-	b vitaShaRK
-	b libmathneon
-	b vitaGL
-	b imgui
-	b imgui-vita2d
-	b libbaremetal
-	b minizip
-	b jsoncpp
-	b lame
-	b ffmpeg
-	b physfs
+	
+	for p in ${PACKAGES[@]}; do
+		b $p
+	done
 }
