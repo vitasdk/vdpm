@@ -83,6 +83,7 @@ PACKAGES=(
 	lame
 	ffmpeg
 	physfs
+	cpython
 )
 
 b() {
