@@ -84,6 +84,7 @@ PACKAGES=(
 	ffmpeg
 	physfs
 	cpython
+	pib
 )
 
 b() {
