@@ -83,7 +83,9 @@ PACKAGES=(
 	lame
 	ffmpeg
 	physfs
+	vita-libdl
 	cpython
+	pib
 )
 
 b() {
