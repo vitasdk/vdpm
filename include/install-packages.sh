@@ -22,6 +22,7 @@ PACKAGES=(
 	libogg
 	libvorbis
 	flac
+	libtheora
 	libtremor
 	libmikmod
 	libftpvita
