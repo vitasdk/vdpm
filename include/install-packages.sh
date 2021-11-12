@@ -84,6 +84,7 @@ PACKAGES=(
 	ffmpeg
 	physfs
 	vita-libdl
+	tinyxml2
 	cpython
 	pib
 )
