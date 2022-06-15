@@ -101,6 +101,7 @@ PACKAGES=(
 	websocketpp
 	wslay
 	SceShaccCgExt
+	boost
 	pib
 )
 
