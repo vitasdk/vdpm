@@ -87,6 +87,20 @@ PACKAGES=(
 	vita-libdl
 	tinyxml2
 	cpython
+	asio
+	assimp
+	opensles
+	cpr
+	libintl
+	libopenmpt
+	libvpx
+	zstd
+	libpcre2
+	fribidi
+	libass
+	websocketpp
+	wslay
+	SceShaccCgExt
 	pib
 )
 
