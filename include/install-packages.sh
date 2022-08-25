@@ -84,7 +84,8 @@ PACKAGES=(
 	lame
 	ffmpeg
 	physfs
-	vita-libdl
+	vita-rss-libdl
+	luajit
 	tinyxml2
 	cpython
 	asio
