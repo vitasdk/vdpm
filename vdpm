@@ -24,7 +24,7 @@ install_pkg() {
     echo "cleaning old confirmation files"
     clean_tmp_file
   else
-    if [ $(find "/tmp/vdpm_install_$1" -cmin -1440 -print) ]; then
+    if [ $(find "/tmp/vdpm_install_$1" -ctime -1 -print) ]; then
       echo "skip install $1. Package previously installed less than one day ago"
     else
       echo "Installing $1..."
