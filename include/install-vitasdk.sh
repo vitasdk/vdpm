@@ -4,6 +4,10 @@ get_download_link () {
   wget -qO- https://github.com/vitasdk/vita-headers/raw/master/.travis.d/last_built_toolchain.py | python3 - $@
 }
 
+get_download_link_arm () {
+  curl -s https://api.github.com/repos/SonicMastr/autobuilds/releases/latest | awk -F\" '/browser_download_url.*.tar.bz2/{print $(NF-1)}'
+}
+
 install_vitasdk () {
   INSTALLDIR=$1
 
@@ -22,7 +26,11 @@ install_vitasdk () {
         sudo mkdir -p $INSTALLDIR
         sudo chown $USER:$(id -gn $USER) $INSTALLDIR
       fi
-      wget -O- "$(get_download_link master linux)" | tar xj -C $INSTALLDIR --strip-components=1
+      if ! [[ "$(uname -m)" =~ ^(armv7l|arm64|aarch64)$ ]]; then
+        wget -O- "$(get_download_link master linux)" | tar xj -C $INSTALLDIR --strip-components=1
+      else
+        wget -O- "$(get_download_link_arm)" | tar xj -C $INSTALLDIR --strip-components=1
+      fi
      ;;
 
      MSYS*|MINGW64*)
