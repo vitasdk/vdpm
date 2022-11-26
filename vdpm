@@ -31,7 +31,7 @@ install_pkg() {
       if [ -f $1 ]; then
         tar -C $VITASDK/arm-vita-eabi -Jxvf $1
       else
-        curl -L https://github.com/vitasdk/packages/releases/download/master/$1.tar.xz | tar -C $VITASDK/arm-vita-eabi -Jxvf -
+        curl -L https://github.com/vitasdk-softfp/packages/releases/download/master/$1.tar.xz | tar -C $VITASDK/arm-vita-eabi -Jxvf -
         write_success $1
       fi
       echo "success"
