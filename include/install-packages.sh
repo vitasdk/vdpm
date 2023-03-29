@@ -88,6 +88,7 @@ PACKAGES=(
 	luajit
 	tinyxml2
 	cpython
+	cpython3
 	asio
 	assimp
 	opensles
