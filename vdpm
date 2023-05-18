@@ -20,22 +20,17 @@ write_success() {
 }
 
 install_pkg() {
-  if [ $CLEAN -eq 1 ]; then
-    echo "cleaning old confirmation files"
-    clean_tmp_file
+  if [ $(find "/tmp/vdpm_install_$1" -ctime -1 -print) ]; then
+    echo "skip install $1. Package previously installed less than one day ago"
   else
-    if [ $(find "/tmp/vdpm_install_$1" -ctime -1 -print) ]; then
-      echo "skip install $1. Package previously installed less than one day ago"
+    echo "Installing $1..."
+    if [ -f $1 ]; then
+      tar -C $VITASDK/arm-vita-eabi -Jxvf $1
     else
-      echo "Installing $1..."
-      if [ -f $1 ]; then
-        tar -C $VITASDK/arm-vita-eabi -Jxvf $1
-      else
-        curl -L https://github.com/vitasdk/packages/releases/download/master/$1.tar.xz | tar -C $VITASDK/arm-vita-eabi -Jxvf -
-        write_success $1
-      fi
-      echo "success"
+      curl -L https://github.com/vitasdk/packages/releases/download/master/$1.tar.xz | tar -C $VITASDK/arm-vita-eabi -Jxvf -
+      write_success $1
     fi
+    echo "success"
   fi
 }
 
@@ -44,11 +39,11 @@ clean_tmp_file() {
 }
 
 helpmenu() {
-  echo "Usage: ./vdpm package-name"
+  echo "Usage: ./vdpm [-c | -h | [PACKAGES...]]"
   exit 1
 }
 
-if [ "$#" -ne 1 ]; then
+if [ "$#" -eq 0 ]; then
   helpmenu
 fi
 
@@ -70,4 +65,12 @@ while getopts "hc" opt; do
 done
 
 trap 'error' ERR
-install_pkg $1
+
+if [ $CLEAN -eq 1 ]; then
+  echo "cleaning old confirmation files"
+  clean_tmp_file
+else
+  for p in "$@"; do
+    install_pkg "$p"
+  done
+fi
