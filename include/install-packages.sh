@@ -105,6 +105,7 @@ PACKAGES=(
 	SceShaccCgExt
 	boost
 	pib
+	libxmp
 )
 
 b() {
