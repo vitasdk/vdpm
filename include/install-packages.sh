@@ -106,6 +106,7 @@ PACKAGES=(
 	boost
 	pib
 	libxmp
+	libxmp-lite
 )
 
 b() {
