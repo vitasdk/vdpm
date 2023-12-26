@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 get_download_link () {
   wget -qO- https://github.com/vitasdk/vita-headers/raw/master/.travis.d/last_built_toolchain.py | python3 - $@
@@ -8,7 +8,7 @@ install_vitasdk () {
   INSTALLDIR=$1
 
   case "$(uname -s)" in
-     Darwin*)
+     Darwin*|FreeBSD*)
       mkdir -p $INSTALLDIR
       wget -O- "$(get_download_link master osx)" | tar xj -C $INSTALLDIR --strip-components=1
      ;;
