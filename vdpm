@@ -1,45 +1,128 @@
 #!/bin/bash
 #
-# vitasdk package manager
-# (aka a 5 liner around tar and curl)
+# vitadev package manager
+# (aka a 175 liner around tar and curl)
 #
 
 set -e
 set -o errtrace
 
 CLEAN=0
+FORCE=0
+UNINSTALL=0
 
 error() {
   echo ""
-  echo "Failed to install, the package probably does not exist."
+  echo "Operation failed. Please check the package name, and ensure you are connected to the internet."
   exit 1
 }
 
-write_success() {
-  touch /tmp/vdpm_install_$1
-}
-
-install_pkg() {
-  if [ $(find "/tmp/vdpm_install_$1" -ctime -1 -print) ]; then
-    echo "skip install $1. Package previously installed less than one day ago"
-  else
-    echo "Installing $1..."
-    if [ -f $1 ]; then
-      tar -C $VITASDK/arm-vita-eabi -Jxvf $1
-    else
-      curl -L https://github.com/vitasdk/packages/releases/download/master/$1.tar.xz | tar -C $VITASDK/arm-vita-eabi -Jxvf -
-      write_success $1
-    fi
-    echo "success"
+# Make sure the package list exists
+ensure_pkg_list() {
+  if [ ! -f $PACKAGE_LIST ]; then
+    mkdir -p $(dirname $PACKAGE_LIST)
+    touch $PACKAGE_LIST
   fi
 }
 
-clean_tmp_file() {
-  rm -rf /tmp/vdpm_install_*
+# Check if a package is installed
+pkg_installed() {
+  grep -q "^PACKAGE $1$" "$PACKAGE_LIST"
 }
 
+# Get the files in a package from packages.list
+get_pkg_files() {
+  sed -n "/^PACKAGE $1$/,/^$/ { /^PACKAGE $1$/!p; }" "$PACKAGE_LIST" | sed '$d'
+}
+
+# Add an entry by name (and file list) to packages.list
+append_to_pkg_list() {
+  echo "PACKAGE $1" >> "$PACKAGE_LIST"
+  echo "$2" >> "$PACKAGE_LIST"
+  echo "" >> "$PACKAGE_LIST"
+}
+
+# Remove an entry by name from packages.list
+remove_from_pkg_list() {
+  sed -i "/^PACKAGE $1$/,/^$/d" "$PACKAGE_LIST"
+}
+
+# Loop through all files in a package and delete them. If after deleting a file that came from a package,
+# the directory is empty, delete it too. Keep going up from that until we've removed all redundant directories.
+# This sounds hazardous, but it isn't. A better solution is preferred though -- this was to get around Tar limitations, and it sucks, kind of
+remove_pkg_files() {
+  while read -r filepath; do
+    if [[ -n $filepath ]] && [[ -w $VITASDK_ROOT/$filepath ]]; then
+      rm "$VITASDK_ROOT/$filepath"
+      local dir=$(dirname "$VITASDK_ROOT/$filepath")
+      while [[ -n "$dir" ]] && [[ -z "$(ls -A "$dir")" ]]; do
+        if [[ "$dir" = "$VITASDK_ROOT" ]]; then
+          break
+        fi
+        rm -r "$dir"
+        dir=$(dirname "$dir")
+      done
+    fi
+  done <<< "$1"
+}
+
+# Download and extract a package to the VitaSDK "root"
+# Will return a list of all files (not directories) for package management reasons
+get_and_extract() {
+  if [ -f $1 ]; then
+    tar -C $VITASDK_ROOT -Jxvf $1 | grep -v '/$'
+  else
+    curl -sL https://github.com/vitasdk/packages/releases/download/master/$1.tar.xz | tar -C $VITASDK_ROOT -Jxvf - | grep -v '/$'
+  fi
+}
+
+# Uninstall a package
+uninstall_pkg() {
+  if ! pkg_installed "$1"; then
+    echo "$1 is not installed or isn't in the list of installed packages"
+  else
+    echo "Uninstalling $1..."
+    local files="$(get_pkg_files "$1")"
+    remove_pkg_files "$files"
+    remove_from_pkg_list "$1"
+    echo "Successfully uninstalled $1."
+  fi
+}
+
+# Install a package
+install_pkg() {
+  if pkg_installed "$1"; then
+    if [[ $FORCE -ne 1 ]]; then
+      echo "Not installing $1; Package has already been installed."
+      echo "Use the -f flag to reinstall it/install anyways."
+      return 0
+    else
+      remove_pkg_files "$(get_pkg_files "$1")"
+      remove_from_pkg_list "$1"
+    fi
+  fi
+
+  echo "Installing $1..."
+
+  files=$(get_and_extract $1)
+  append_to_pkg_list "$1" "$files"
+
+  echo "Successfully installed $1"
+}
+
+# Clear the list of installed packages
+clear_package_list() {
+  rm -rf $PACKAGE_LIST
+}
+
+# Show usage
 helpmenu() {
-  echo "Usage: ./vdpm [-c | -h | [PACKAGES...]]"
+  echo "VitaDev Package Manager"
+  echo "Usage: ./vdpm [-c | -h | (-f|-u) [PACKAGES...]]"
+  echo "-c: Clear the package list. Only do this if you know what you're doing."
+  echo "-h: Show this help."
+  echo "-f: Forcefully install the packages. Good for reinstallations."
+  echo "-u: Uninstall the packages."
   exit 1
 }
 
@@ -52,25 +135,41 @@ if [ -z "$VITASDK" ]; then
   exit 1
 fi
 
-while getopts "hc" opt; do
+# Remove trailing slash, for good luck
+VITASDK=${VITASDK%/}
+
+VITASDK_ROOT="$VITASDK/arm-vita-eabi"
+PACKAGE_LIST="$VITASDK/etc/vdpm/packages.list"
+
+while getopts "hcfu" opt; do
   case ${opt} in
     h ) helpmenu
         exit 0
         ;;
-    c )
-    CLEAN=1
-    shift
-    ;;
+    c ) CLEAN=1
+        shift
+        ;;
+    f ) FORCE=1
+	shift
+	;;
+    u ) UNINSTALL=1
+	shift
+	;;
   esac
 done
 
 trap 'error' ERR
+ensure_pkg_list
 
 if [ $CLEAN -eq 1 ]; then
-  echo "cleaning old confirmation files"
-  clean_tmp_file
+  echo "clearing package list..."
+  clear_package_list
 else
   for p in "$@"; do
-    install_pkg "$p"
+    if [ $UNINSTALL -eq 1 ]; then
+      uninstall_pkg "$p"
+    else
+      install_pkg "$p"
+    fi
   done
 fi
