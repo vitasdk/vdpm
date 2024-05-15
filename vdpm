@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # vitadev package manager
-# (aka a 175 liner around tar and curl)
+# (aka a 179 liner around tar and curl)
 #
 
 set -e
@@ -32,7 +32,15 @@ pkg_installed() {
 
 # Get the files in a package from packages.list
 get_pkg_files() {
-  sed -n "/^PACKAGE $1$/,/^$/ { /^PACKAGE $1$/!p; }" "$PACKAGE_LIST" | sed '$d'
+  local file_list="$(sed -n "/^PACKAGE $1$/,/^$/ { /^PACKAGE $1$/!p; }" "$PACKAGE_LIST" | sed '$d')"
+  while IFS= read -r line; do
+    if [[ $line == */ ]]; then
+	sorted_list="$sorted_list"$'\n'"$line"
+    else
+        sorted_list="$line"$'\n'"$sorted_list"
+    fi
+  done <<< "$file_list"
+  echo "$sorted_list"
 }
 
 # Add an entry by name (and file list) to packages.list
@@ -47,32 +55,32 @@ remove_from_pkg_list() {
   sed -i "/^PACKAGE $1$/,/^$/d" "$PACKAGE_LIST"
 }
 
-# Loop through all files in a package and delete them. If after deleting a file that came from a package,
-# the directory is empty, delete it too. Keep going up from that until we've removed all redundant directories.
-# This sounds hazardous, but it isn't. A better solution is preferred though -- this was to get around Tar limitations, and it sucks, kind of
-remove_pkg_files() {
+# Loop through all files/folders in a package and delete them.
+# If a file/folder is wanted by another package, or a folder isn't empty, then it won't be deleted.
+remove_pkg() {
+  remove_from_pkg_list "$1"
   while read -r filepath; do
     if [[ -n $filepath ]] && [[ -w $VITASDK_ROOT/$filepath ]]; then
-      rm "$VITASDK_ROOT/$filepath"
-      local dir=$(dirname "$VITASDK_ROOT/$filepath")
-      while [[ -n "$dir" ]] && [[ -z "$(ls -A "$dir")" ]]; do
-        if [[ "$dir" = "$VITASDK_ROOT" ]]; then
-          break
-        fi
-        rm -r "$dir"
-        dir=$(dirname "$dir")
-      done
+      local operation_path="$VITASDK_ROOT/$filepath"
+
+      if grep -q "^$filepath$" "$PACKAGE_LIST"; then
+	echo "Considered removing $filepath, but it's wanted by another package"
+      elif [[ -d "$operation_path" ]] && [[ ! -z "$(ls -A "$operation_path")" ]]; then
+	echo "Considered removing $filepath, but it's not empty"
+      else
+	rm -r "$operation_path"
+      fi
     fi
-  done <<< "$1"
+  done <<< "$2"
 }
 
 # Download and extract a package to the VitaSDK "root"
 # Will return a list of all files (not directories) for package management reasons
 get_and_extract() {
   if [ -f $1 ]; then
-    tar -C $VITASDK_ROOT -Jxvf $1 | grep -v '/$'
+    tar -C $VITASDK_ROOT -Jxvf $1
   else
-    curl -sL https://github.com/vitasdk/packages/releases/download/master/$1.tar.xz | tar -C $VITASDK_ROOT -Jxvf - | grep -v '/$'
+    curl -sL https://github.com/vitasdk/packages/releases/download/master/$1.tar.xz | tar -C $VITASDK_ROOT -Jxvf -
   fi
 }
 
@@ -83,8 +91,7 @@ uninstall_pkg() {
   else
     echo "Uninstalling $1..."
     local files="$(get_pkg_files "$1")"
-    remove_pkg_files "$files"
-    remove_from_pkg_list "$1"
+    remove_pkg "$1" "$files"
     echo "Successfully uninstalled $1."
   fi
 }
@@ -97,16 +104,13 @@ install_pkg() {
       echo "Use the -f flag to reinstall it/install anyways."
       return 0
     else
-      remove_pkg_files "$(get_pkg_files "$1")"
-      remove_from_pkg_list "$1"
+      remove_pkg "$1" "$(get_pkg_files "$1")"
     fi
   fi
 
   echo "Installing $1..."
-
-  files=$(get_and_extract $1)
+  local files="$(get_and_extract $1)"
   append_to_pkg_list "$1" "$files"
-
   echo "Successfully installed $1"
 }
 
