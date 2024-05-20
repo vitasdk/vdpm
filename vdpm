@@ -75,7 +75,7 @@ remove_pkg() {
 }
 
 # Download and extract a package to the VitaSDK "root"
-# Will return a list of all files (not directories) for package management reasons
+# Will return a list of all files and directories for package management reasons
 get_and_extract() {
   if [ -f $1 ]; then
     tar -C $VITASDK_ROOT -Jxvf $1
