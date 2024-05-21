@@ -110,7 +110,7 @@ PACKAGES=(
 )
 
 b() {
-	$DIR/../vdpm $1
+	$DIR/../vdpm -f $1
 }
 
 install_packages() {
