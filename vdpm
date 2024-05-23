@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # vitadev package manager
 # (aka a 179 liner around tar and curl)
