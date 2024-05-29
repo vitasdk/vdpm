@@ -19,6 +19,7 @@ Getting started
 ### Mac & Linux
 First install cmake, you can get this from [Homebrew](http://brew.sh) on Mac (`brew install cmake`), 
 and from your distro's package manager on Linux (on ubuntu: `sudo apt-get install cmake`).
+Set the environment variable VITASDK to be the install destination for Vita SDK. We recommend using /usr/local/vitasdk. We also recommend making the change to your .bashrc or .zshrc(as Catalina uses the new Zsh shell and you can revert back and forth between either depending on your comfort but be careful about your current shell while you're loading) or equivalent (.bash_profile on OSX) since using the toolchain requires VITASDK to be set.
 
 ```shell
 git clone https://github.com/vitasdk/vdpm
