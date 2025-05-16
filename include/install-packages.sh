@@ -107,6 +107,9 @@ PACKAGES=(
 	pib
 	libxmp
 	libxmp-lite
+	sdl3
+	sdl3_image
+	sdl3_ttf
 )
 
 b() {
