@@ -52,7 +52,11 @@ append_to_pkg_list() {
 
 # Remove an entry by name from packages.list
 remove_from_pkg_list() {
-  sed -i "/^PACKAGE $1$/,/^$/d" "$PACKAGE_LIST"
+  if [[ "$(uname)" == "Darwin" ]]; then
+    sed "/^PACKAGE $1$/,/^$/d" "$PACKAGE_LIST"
+  else
+    sed -i "/^PACKAGE $1$/,/^$/d" "$PACKAGE_LIST"
+  fi
 }
 
 # Loop through all files/folders in a package and delete them.
