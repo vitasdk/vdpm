@@ -20,6 +20,11 @@ public_key=${VITASDK_CHANNEL_PUBLIC_KEY:-$VITASDK/share/vdpm/channel-public-key.
 	printf 'channel public key is not installed: %s\n' "$public_key" >&2
 	exit 1
 }
+channel_tool=${VDPM_CHANNEL_TOOL:-$script_directory/../vdpm-channel}
+[[ -x $channel_tool ]] || {
+	printf 'channel helper is not installed: %s\n' "$channel_tool" >&2
+	exit 1
+}
 [[ ! -e $VITASDK/var/lib/pacman/db.lck ]] || {
 	printf 'pacman database is locked; repository refresh refused\n' >&2
 	exit 1
@@ -44,19 +49,18 @@ else
 	download "$base/$channel.json.sig" "$signature"
 fi
 
-openssl pkeyutl -verify -pubin -inkey "$public_key" -rawin \
-	-in "$manifest" -sigfile "$signature" >/dev/null
-python3 "$script_directory/channel-manifest.py" "$manifest" "$channel" "$host"
+# The manifest is authenticated before it is parsed, so no untrusted structure
+# is interpreted on the strength of an unverified signature.
+"$channel_tool" verify "$manifest" "$signature" "$public_key"
+"$channel_tool" validate "$manifest" "$channel" "$host"
 
 value() {
-	python3 "$script_directory/channel-manifest.py" "$manifest" "$channel" "$host" "$1"
+	"$channel_tool" field "$manifest" "$channel" "$host" "$1"
 }
 verify_hash() {
-	local expected=$1 file=$2 actual
-	if command -v sha256sum >/dev/null; then actual=$(sha256sum "$file");
-	else actual=$(shasum -a 256 "$file"); fi
-	actual=${actual%% *}
-	[[ $actual == "$expected" ]]
+	local expected=$1 file=$2
+
+	[[ $("$channel_tool" sha256 "$file") == "$expected" ]]
 }
 
 core_database="$temporary_directory/$host.db"

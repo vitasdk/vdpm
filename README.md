@@ -21,11 +21,17 @@ The historical forms `vdpm PACKAGE...`, `vdpm -f PACKAGE...` and
 ## Repository trust
 
 `vdpm refresh` downloads a canonical channel manifest and detached Ed25519
-signature. OpenSSL verifies the signature against the public key installed in
-`$VITASDK/share/vdpm/channel-public-key.pem`. The manifest selects immutable
-SDK and library release tags and contains the SHA-256 of each pacman database.
-Only verified databases are placed in pacman's local sync directory; package
-hashes are subsequently enforced by pacman from those databases.
+signature. The `vdpm-channel` helper installed with the SDK verifies the
+signature against the public key installed in
+`$VITASDK/share/vdpm/channel-public-key.pem`, and only then parses the
+manifest. It selects immutable SDK and library release tags and contains the
+SHA-256 of each pacman database. Only verified databases are placed in pacman's
+local sync directory; package hashes are subsequently enforced by pacman from
+those databases.
+
+Signature checking, manifest parsing and digests are all performed by that
+helper so that a security decision never depends on which interpreter or
+command line tool happens to be installed on the host.
 
 No production public key has been committed yet. Until the VitaSDK
 organization provisions and publishes that key, channel refresh intentionally
