@@ -1,179 +1,133 @@
-#!/bin/bash
-#
-# vitadev package manager
-# (aka a 179 liner around tar and curl)
-#
+#!/usr/bin/env bash
 
-set -e
-set -o errtrace
+set -euo pipefail
 
-CLEAN=0
-FORCE=0
-UNINSTALL=0
+usage() {
+	cat <<'EOF'
+VitaSDK package manager
 
-error() {
-  echo ""
-  echo "Operation failed. Please check the package name, and ensure you are connected to the internet."
-  exit 1
+Usage:
+  vdpm install [--force] PACKAGE...
+  vdpm remove PACKAGE...
+  vdpm upgrade [PACKAGE...]
+  vdpm list [PACKAGE...]
+  vdpm search TERM...
+  vdpm info PACKAGE...
+  vdpm files PACKAGE...
+  vdpm refresh [stable|nightly]
+
+Compatibility:
+  vdpm PACKAGE...       Same as `vdpm install PACKAGE...`
+  vdpm -f PACKAGE...    Reinstall packages
+  vdpm -u PACKAGE...    Remove packages
+EOF
 }
 
-# Make sure the package list exists
-ensure_pkg_list() {
-  if [ ! -f $PACKAGE_LIST ]; then
-    mkdir -p $(dirname $PACKAGE_LIST)
-    touch $PACKAGE_LIST
-  fi
+die() {
+	printf 'vdpm: %s\n' "$*" >&2
+	exit 1
 }
 
-# Check if a package is installed
-pkg_installed() {
-  grep -q "^PACKAGE $1$" "$PACKAGE_LIST"
-}
-
-# Get the files in a package from packages.list
-get_pkg_files() {
-  local file_list="$(sed -n "/^PACKAGE $1$/,/^$/ { /^PACKAGE $1$/!p; }" "$PACKAGE_LIST" | sed '$d')"
-  while IFS= read -r line; do
-    if [[ $line == */ ]]; then
-	sorted_list="$sorted_list"$'\n'"$line"
-    else
-        sorted_list="$line"$'\n'"$sorted_list"
-    fi
-  done <<< "$file_list"
-  echo "$sorted_list"
-}
-
-# Add an entry by name (and file list) to packages.list
-append_to_pkg_list() {
-  echo "PACKAGE $1" >> "$PACKAGE_LIST"
-  echo "$2" >> "$PACKAGE_LIST"
-  echo "" >> "$PACKAGE_LIST"
-}
-
-# Remove an entry by name from packages.list
-remove_from_pkg_list() {
-  sed -i "/^PACKAGE $1$/,/^$/d" "$PACKAGE_LIST"
-}
-
-# Loop through all files/folders in a package and delete them.
-# If a file/folder is wanted by another package, or a folder isn't empty, then it won't be deleted.
-remove_pkg() {
-  remove_from_pkg_list "$1"
-  while read -r filepath; do
-    if [[ -n $filepath ]] && [[ -w $VITASDK_ROOT/$filepath ]]; then
-      local operation_path="$VITASDK_ROOT/$filepath"
-
-      if grep -q "^$filepath$" "$PACKAGE_LIST"; then
-	echo "Considered removing $filepath, but it's wanted by another package"
-      elif [[ -d "$operation_path" ]] && [[ ! -z "$(ls -A "$operation_path")" ]]; then
-	echo "Considered removing $filepath, but it's not empty"
-      else
-	rm -r "$operation_path"
-      fi
-    fi
-  done <<< "$2"
-}
-
-# Download and extract a package to the VitaSDK "root"
-# Will return a list of all files and directories for package management reasons
-get_and_extract() {
-  if [ -f $1 ]; then
-    tar -C $VITASDK_ROOT -Jxvf $1
-  else
-    curl -sL https://github.com/vitasdk/packages/releases/download/master/$1.tar.xz | tar -C $VITASDK_ROOT -Jxvf -
-  fi
-}
-
-# Uninstall a package
-uninstall_pkg() {
-  if ! pkg_installed "$1"; then
-    echo "$1 is not installed or isn't in the list of installed packages"
-  else
-    echo "Uninstalling $1..."
-    local files="$(get_pkg_files "$1")"
-    remove_pkg "$1" "$files"
-    echo "Successfully uninstalled $1."
-  fi
-}
-
-# Install a package
-install_pkg() {
-  if pkg_installed "$1"; then
-    if [[ $FORCE -ne 1 ]]; then
-      echo "Not installing $1; Package has already been installed."
-      echo "Use the -f flag to reinstall it/install anyways."
-      return 0
-    else
-      remove_pkg "$1" "$(get_pkg_files "$1")"
-    fi
-  fi
-
-  echo "Installing $1..."
-  local files="$(get_and_extract $1)"
-  append_to_pkg_list "$1" "$files"
-  echo "Successfully installed $1"
-}
-
-# Clear the list of installed packages
-clear_package_list() {
-  rm -rf $PACKAGE_LIST
-}
-
-# Show usage
-helpmenu() {
-  echo "VitaDev Package Manager"
-  echo "Usage: ./vdpm [-c | -h | (-f|-u) [PACKAGES...]]"
-  echo "-c: Clear the package list. Only do this if you know what you're doing."
-  echo "-h: Show this help."
-  echo "-f: Forcefully install the packages. Good for reinstallations."
-  echo "-u: Uninstall the packages."
-  exit 1
-}
-
-if [ "$#" -eq 0 ]; then
-  helpmenu
-fi
-
-if [ -z "$VITASDK" ]; then
-  echo '$VITASDK is not set'
-  exit 1
-fi
-
-# Remove trailing slash, for good luck
+[[ -n ${VITASDK:-} && $VITASDK == /* && $VITASDK != / ]] ||
+	die 'VITASDK must be an absolute, non-root path'
 VITASDK=${VITASDK%/}
 
-VITASDK_ROOT="$VITASDK/arm-vita-eabi"
-PACKAGE_LIST="$VITASDK/etc/vdpm/packages.list"
+pacman=${VDPM_PACMAN:-$VITASDK/bin/pacman}
+configuration=${VDPM_PACMAN_CONF:-$VITASDK/etc/pacman.conf}
+script_directory=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 
-while getopts "hcfu" opt; do
-  case ${opt} in
-    h ) helpmenu
-        exit 0
-        ;;
-    c ) CLEAN=1
-        shift
-        ;;
-    f ) FORCE=1
-	shift
-	;;
-    u ) UNINSTALL=1
-	shift
-	;;
-  esac
-done
+[[ -x $pacman ]] || die "package client is not executable: $pacman"
+[[ -r $configuration ]] || die "package configuration is not readable: $configuration"
 
-trap 'error' ERR
-ensure_pkg_list
+mkdir -p "$VITASDK/var/lib/pacman" "$VITASDK/var/cache/pacman/pkg" \
+	"$VITASDK/var/log"
 
-if [ $CLEAN -eq 1 ]; then
-  echo "clearing package list..."
-  clear_package_list
-else
-  for p in "$@"; do
-    if [ $UNINSTALL -eq 1 ]; then
-      uninstall_pkg "$p"
-    else
-      install_pkg "$p"
-    fi
-  done
+common_arguments=(
+	--config "$configuration"
+	--root "$VITASDK"
+	--dbpath "$VITASDK/var/lib/pacman"
+	--cachedir "$VITASDK/var/cache/pacman/pkg"
+	--logfile "$VITASDK/var/log/pacman.log"
+	--noscriptlet
+)
+if [[ ${VDPM_NONINTERACTIVE:-0} == 1 ]]; then
+	common_arguments+=(--noconfirm --noprogressbar)
 fi
+
+run_pacman() {
+	"$pacman" "${common_arguments[@]}" "$@"
+}
+
+(( $# > 0 )) || {
+	usage
+	exit 2
+}
+
+force=0
+case $1 in
+	-h|--help)
+		usage
+		exit 0
+		;;
+	-f)
+		force=1
+		shift
+		command=install
+		;;
+	-u)
+		shift
+		command=remove
+		;;
+	install|remove|upgrade|list|search|info|files|refresh)
+		command=$1
+		shift
+		;;
+	*)
+		command=install
+		;;
+esac
+
+if [[ ${1:-} == --force ]]; then
+	[[ $command == install ]] || die '--force is valid only with install'
+	force=1
+	shift
+fi
+
+case $command in
+	install)
+		(( $# > 0 )) || die 'install requires at least one package'
+		install_arguments=(--sync)
+		(( force )) || install_arguments+=(--needed)
+		run_pacman "${install_arguments[@]}" "$@"
+		;;
+	remove)
+		(( $# > 0 )) || die 'remove requires at least one package'
+		run_pacman --remove "$@"
+		;;
+	upgrade)
+		if (( $# > 0 )); then
+			run_pacman --sync "$@"
+		else
+			run_pacman --sync --sysupgrade
+		fi
+		;;
+	list)
+		run_pacman --query "$@"
+		;;
+	search)
+		(( $# > 0 )) || die 'search requires a term'
+		run_pacman --sync --search "$@"
+		;;
+	info)
+		(( $# > 0 )) || die 'info requires at least one package'
+		run_pacman --sync --info "$@"
+		;;
+	files)
+		(( $# > 0 )) || die 'files requires at least one package'
+		run_pacman --query --list "$@"
+		;;
+	refresh)
+		(( $# <= 1 )) || die 'refresh accepts at most one channel'
+		"$script_directory/include/refresh-repositories.sh" "${1:-stable}"
+		;;
+esac
