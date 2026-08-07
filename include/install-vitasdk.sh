@@ -1,45 +1,48 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-get_download_link () {
-  wget -qO- https://github.com/vitasdk/vita-headers/raw/master/.travis.d/last_built_toolchain.py | python3 - $@
+set -euo pipefail
+
+verify_sha256() {
+	local expected=$1 file=$2 actual
+	if command -v sha256sum >/dev/null; then
+		actual=$(sha256sum "$file")
+	else
+		actual=$(shasum -a 256 "$file")
+	fi
+	actual=${actual%% *}
+	[[ $actual == "$expected" ]]
 }
 
-install_vitasdk () {
-  INSTALLDIR=$1
+install_vitasdk() {
+	local install_directory=$1
+	local archive
+	local url=${VITASDK_BOOTSTRAP_URL:-}
+	local expected_sha256=${VITASDK_BOOTSTRAP_SHA256:-}
 
-  case "$(uname -s)" in
-     Darwin*)
-      mkdir -p $INSTALLDIR
-      wget -O- "$(get_download_link master osx)" | tar xj -C $INSTALLDIR --strip-components=1
-     ;;
+	[[ -n $url ]] || {
+		printf 'VITASDK_BOOTSTRAP_URL must select an immutable SDK archive\n' >&2
+		return 1
+	}
+	[[ $expected_sha256 =~ ^[0-9a-f]{64}$ ]] || {
+		printf 'VITASDK_BOOTSTRAP_SHA256 must contain the published archive hash\n' >&2
+		return 1
+	}
 
-     Linux*)
-      if [ -n "${TRAVIS}" ]; then
-          sudo apt-get install libc6-i386 lib32stdc++6 lib32gcc1 patch
-      fi
-      command -v curl || { echo "curl missing (install using: apt install curl)" ; exit 1; }
-      if [ ! -d "$INSTALLDIR" ]; then
-        sudo mkdir -p $INSTALLDIR
-        sudo chown $USER:$(id -gn $USER) $INSTALLDIR
-      fi
-      wget -O- "$(get_download_link master linux)" | tar xj -C $INSTALLDIR --strip-components=1
-     ;;
+	mkdir -p "$install_directory"
+	archive=$(mktemp "${TMPDIR:-/tmp}/vitasdk-bootstrap.XXXXXXXX.tar.bz2")
+	trap 'rm -f -- "$archive"' RETURN
 
-     MSYS*|MINGW64*)
-      UNIX=false
-      mkdir -p $INSTALLDIR
-      wget -O- "$(get_download_link master win)" | tar xj -C $INSTALLDIR --strip-components=1
-     ;;
-
-     CYGWIN*|MINGW32*)
-      echo "Please use msys2. Exiting..."
-      exit 1
-     ;;
-
-     *)
-       echo "Unknown OS"
-       exit 1
-      ;;
-  esac
-
+	if command -v curl >/dev/null; then
+		curl --fail --location --show-error --output "$archive" "$url"
+	elif command -v wget >/dev/null; then
+		wget --output-document="$archive" "$url"
+	else
+		printf 'curl or wget is required to bootstrap VitaSDK\n' >&2
+		return 1
+	fi
+	verify_sha256 "$expected_sha256" "$archive" || {
+		printf 'VitaSDK bootstrap archive hash mismatch\n' >&2
+		return 1
+	}
+	tar -xjf "$archive" -C "$install_directory" --strip-components=1
 }
