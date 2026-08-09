@@ -64,7 +64,9 @@ jobs:
           sudo apt-get install -y build-essential cmake meson ninja-build pkg-config
       - name: Install macOS build dependencies
         if: runner.os == 'macOS'
-        run: brew install meson ninja pkg-config
+        run: |
+          brew install bash meson ninja pkg-config
+          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
       - name: Build the complete product
         shell: bash
         run: |
