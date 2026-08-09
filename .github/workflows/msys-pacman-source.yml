@@ -5,8 +5,7 @@ on:
     paths:
       - .gitattributes
       - CMakeLists.txt
-      - cmake/PackageClient.cmake
-      - cmake/PackageClientVersions.cmake
+      - cmake/**
       - patches/pacman/**
       - tests/pacman/msys-pacman-build.sh
       - tests/pacman/msys-runtime-smoke.ps1
@@ -17,8 +16,7 @@ on:
     paths:
       - .gitattributes
       - CMakeLists.txt
-      - cmake/PackageClient.cmake
-      - cmake/PackageClientVersions.cmake
+      - cmake/**
       - patches/pacman/**
       - tests/pacman/msys-pacman-build.sh
       - tests/pacman/msys-runtime-smoke.ps1
