@@ -180,13 +180,87 @@ static int make_directories(const char *path)
 	return result;
 }
 
+#ifdef _WIN32
+/* MSVCRT's spawn family joins argv into a Windows command line but does not
+ * protect embedded whitespace for every kind of child executable. Quote using
+ * the CommandLineToArgvW rules so native PowerShell and the MSYS CRT receive
+ * exactly the argument boundaries vdpm constructed. */
+static char *quote_windows_argument(const char *argument)
+{
+	size_t length = strlen(argument);
+	size_t index;
+	size_t output = 0;
+	int needs_quotes = length == 0;
+	char *quoted;
+
+	for (index = 0; index < length; ++index)
+		if (argument[index] == ' ' || argument[index] == '\t' ||
+			argument[index] == '\n' || argument[index] == '"')
+			needs_quotes = 1;
+	if (!needs_quotes)
+		return duplicate_string(argument);
+	quoted = allocate(length * 2 + 3);
+	quoted[output++] = '"';
+	for (index = 0; index < length;) {
+		size_t backslashes = 0;
+
+		while (index < length && argument[index] == '\\') {
+			backslashes++;
+			index++;
+		}
+		if (index == length) {
+			while (backslashes > 0) {
+				quoted[output++] = '\\';
+				quoted[output++] = '\\';
+				backslashes--;
+			}
+			break;
+		}
+		if (argument[index] == '"') {
+			while (backslashes > 0) {
+				quoted[output++] = '\\';
+				quoted[output++] = '\\';
+				backslashes--;
+			}
+			quoted[output++] = '\\';
+			quoted[output++] = '"';
+		} else {
+			while (backslashes > 0) {
+				quoted[output++] = '\\';
+				backslashes--;
+			}
+			quoted[output++] = argument[index];
+		}
+		index++;
+	}
+	quoted[output++] = '"';
+	quoted[output] = '\0';
+	return quoted;
+}
+#endif
+
 static int run_process(const char *path, char *const arguments[])
 {
 	fflush(NULL);
 #ifdef _WIN32
 	{
-		intptr_t status = _spawnv(_P_WAIT, path,
-			(const char *const *)arguments);
+		char **quoted_arguments;
+		size_t count = 0;
+		size_t index;
+		intptr_t status;
+
+		while (arguments[count])
+			count++;
+		quoted_arguments = allocate((count + 1) * sizeof(*quoted_arguments));
+		for (index = 0; index < count; ++index)
+			quoted_arguments[index] = quote_windows_argument(arguments[index]);
+		quoted_arguments[count] = NULL;
+		status = _spawnv(_P_WAIT, path,
+			(const char *const *)quoted_arguments);
+
+		for (index = 0; index < count; ++index)
+			free(quoted_arguments[index]);
+		free(quoted_arguments);
 
 		if (status == -1) {
 			fprintf(stderr, "%s: could not start package client: %s\n",
