@@ -72,7 +72,8 @@ channel_libraries=$(pkg-config --static --libs libcrypto)
 # shellcheck disable=SC2086
 gcc -std=c99 -O2 -Wall -Wextra -Werror -static-libgcc \
 	-o "$output_directory/vdpm-channel.exe" \
-	"$repository_root/src/vdpm-channel.c" $channel_flags $channel_libraries
+	"$repository_root/src/vdpm-channel.c" $channel_flags \
+	-Wl,-Bstatic $channel_libraries -Wl,-Bdynamic
 cp /usr/bin/msys-2.0.dll "$output_directory/msys-2.0.dll"
 mkdir -p "$output_directory/licenses"
 cp "$source_directory/COPYING" \
