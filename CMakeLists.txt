@@ -15,6 +15,19 @@ set(VDPM_DOWNLOAD_DIR "${CMAKE_BINARY_DIR}/downloads" CACHE PATH
 set(VDPM_PACKAGE_CLIENT_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}" CACHE PATH
     "Install prefix for Pacman, pacman-conf and the channel helper")
 
+install(FILES LICENSE
+    DESTINATION share/vdpm/licenses
+    RENAME vdpm-LGPL-2.1.txt)
+install(FILES THIRD_PARTY_NOTICES.md DESTINATION share/vdpm)
+install(PROGRAMS bootstrap-vitasdk.sh DESTINATION share/vdpm)
+install(FILES bootstrap-vitasdk.ps1 DESTINATION share/vdpm)
+if(UNIX)
+    install(DIRECTORY include/
+        DESTINATION bin/include
+        USE_SOURCE_PERMISSIONS
+        FILES_MATCHING PATTERN "*.sh")
+endif()
+
 if(BUILD_VDPM_PACKAGE_CLIENT)
     # OpenSSL is a private package-client input. Configure the channel helper
     # only after that archive exists, while the frontend remains a normal
@@ -52,4 +65,8 @@ if(BUILD_TESTING AND UNIX)
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-vdpm.sh")
     add_test(NAME vdpm-channel-manifest-contract
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-channel-manifest.sh")
+    add_test(NAME vdpm-release-bundle-contract
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-release-bundle.sh")
+    add_test(NAME vdpm-bootstrap-contract
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-bootstrap.sh")
 endif()

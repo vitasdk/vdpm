@@ -71,9 +71,9 @@ fails closed and no package-managed snapshot can be promoted to stable.
 
 ## Transitional bootstrap
 
-The mutable “latest master release” lookup has been removed. During the
-migration, `bootstrap-vitasdk.sh` accepts only an explicitly selected immutable
-legacy archive and its published SHA-256:
+The mutable “latest master release” lookup has been removed. The Unix and
+Windows bootstrap programs accept only an explicitly selected immutable SDK
+archive and its published SHA-256:
 
 ```sh
 VITASDK_BOOTSTRAP_URL='https://github.com/vitasdk/autobuilds/releases/download/<tag>/<asset>' \
@@ -81,5 +81,26 @@ VITASDK_BOOTSTRAP_SHA256='<64 hexadecimal characters>' \
 ./bootstrap-vitasdk.sh
 ```
 
-This transitional path will be replaced by the signed channel bootstrap after
-the production key and complete Windows package client are available.
+PowerShell uses the equivalent `bootstrap-vitasdk.ps1`. Both implementations
+download into a temporary sibling directory, verify the digest, reject unsafe
+archive paths, extract and validate the package manager and compiler, and only
+then move the complete SDK into place. A failed bootstrap leaves no partial
+installation at the requested destination.
+
+This is intentionally a clean-install boundary. The old `packages.list`
+database cannot safely describe file ownership to Pacman, so replacing only
+the legacy `vdpm` executable inside an existing SDK is unsupported. The Bash
+and C Pacman frontends are interchangeable once the SDK already contains the
+new Pacman database and configuration.
+
+## Component releases
+
+`.github/workflows/release.yml` builds reproducible, host-specific product
+bundles for Linux x86_64, Linux aarch64, macOS arm64 and Windows x86_64. Every
+bundle carries its source revision, complete third-party notices and license
+texts. Tags named `v*` are published first as a draft release; the workflow
+downloads and byte-compares all assets before making the release visible.
+
+These component releases contain the package manager, not the compiler SDK.
+`buildscripts` incorporates an exact vdpm revision and `autobuilds` publishes
+the final `vitasdk-bootstrap-<host>` archives consumed by the bootstrap tools.

@@ -1,0 +1,253 @@
+name: Build vdpm release bundles
+
+on:
+  pull_request:
+    paths:
+      - .gitattributes
+      - CMakeLists.txt
+      - THIRD_PARTY_NOTICES.md
+      - cmake/**
+      - include/**
+      - patches/pacman/**
+      - scripts/**
+      - src/**
+      - tests/pacman/**
+      - tests/test-release-bundle.sh
+      - .github/workflows/release.yml
+  push:
+    branches: [next]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      source_date_epoch: ${{ steps.release.outputs.source_date_epoch }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: release
+        shell: bash
+        run: |
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            version=${GITHUB_REF_NAME#v}
+            [[ $version =~ ^[A-Za-z0-9][A-Za-z0-9.+-]*$ ]]
+          else
+            version="0.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "source_date_epoch=$(git show -s --format=%ct HEAD)" >> "$GITHUB_OUTPUT"
+
+  build-unix:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: x86_64-linux-gnu
+            runner: ubuntu-24.04
+          - host: aarch64-linux-gnu
+            runner: ubuntu-24.04-arm
+          - host: arm64-apple-darwin
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake meson ninja-build pkg-config
+      - name: Install macOS build dependencies
+        if: runner.os == 'macOS'
+        run: brew install meson ninja pkg-config
+      - name: Build the complete product
+        shell: bash
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$PWD/stage" \
+            -DBUILD_VDPM_PACKAGE_CLIENT=ON \
+            -DBUILD_VDPM_CHANNEL=ON \
+            -DVDPM_PACKAGE_CLIENT_INSTALL_PREFIX="$PWD/stage"
+          if [[ $RUNNER_OS == macOS ]]; then
+            jobs=$(sysctl -n hw.logicalcpu)
+          else
+            jobs=$(nproc)
+          fi
+          cmake --build build --target install --parallel "$jobs"
+      - name: Create and validate release bundle
+        shell: bash
+        env:
+          SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
+        run: |
+          revision=$(git rev-parse HEAD)
+          scripts/create-release-bundle.sh \
+            "$PWD/stage" "$PWD/release" '${{ matrix.host }}' \
+            '${{ needs.prepare.outputs.version }}' "$revision"
+          VDPM_VALIDATE_EXECUTABLES=1 scripts/validate-release-bundle.sh \
+            release/*.tar.bz2 '${{ matrix.host }}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vdpm-${{ matrix.host }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  build-windows:
+    needs: prepare
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v6
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: MSYS
+          update: true
+          install: >-
+            base-devel
+            git
+            gcc
+            meson
+            ninja
+            pkgconf
+            gettext-devel
+            heimdal-devel
+            libarchive-devel
+            libcurl-devel
+            libsqlite-devel
+            libunistring-devel
+            openssl-devel
+      - name: Build patched Pacman runtime
+        shell: msys2 {0}
+        run: >-
+          ./tests/pacman/msys-pacman-build.sh
+          "$(cygpath -u "$RUNNER_TEMP")/vdpm-pacman"
+      - name: Build native vdpm frontend
+        shell: pwsh
+        run: |
+          cmake.exe -S . -B build-windows `
+            -DBUILD_VDPM_CHANNEL=OFF `
+            -DBUILD_VDPM_PACKAGE_CLIENT=OFF `
+            -DCMAKE_INSTALL_PREFIX="$pwd/stage" `
+            -A x64
+          cmake.exe --build build-windows --config Release --target install
+      - name: Assemble, create and validate release bundle
+        shell: msys2 {0}
+        env:
+          SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
+        run: |
+          stage=$(cygpath -u "$GITHUB_WORKSPACE/stage")
+          pacman_stage=$(cygpath -u "$RUNNER_TEMP/vdpm-pacman")
+          mkdir -p "$stage/usr/bin" "$stage/share/vdpm/licenses"
+          cp "$pacman_stage/pacman.exe" "$stage/usr/bin/"
+          cp "$pacman_stage/msys-2.0.dll" "$stage/usr/bin/"
+          cp -R "$pacman_stage/licenses/." "$stage/share/vdpm/licenses/"
+          revision=$(git rev-parse HEAD)
+          scripts/create-release-bundle.sh \
+            "$stage" "$PWD/release" x86_64-w64-mingw32 \
+            '${{ needs.prepare.outputs.version }}' "$revision"
+          scripts/validate-release-bundle.sh \
+            release/*.tar.bz2 x86_64-w64-mingw32
+      - name: Exercise exact Windows bundle inputs
+        shell: pwsh
+        run: |
+          ./tests/pacman/msys-runtime-smoke.ps1 `
+            -WorkDirectory (Join-Path $env:RUNNER_TEMP "vdpm release ñ 日本語") `
+            -FixtureTar (Join-Path '${{ steps.msys2.outputs.msys2-location }}' 'usr/bin/bsdtar.exe') `
+            -PacmanExecutable (Join-Path $env:RUNNER_TEMP 'vdpm-pacman/pacman.exe') `
+            -RuntimeDll (Join-Path $env:RUNNER_TEMP 'vdpm-pacman/msys-2.0.dll') `
+            -Extended
+      - name: Exercise atomic Windows bootstrap
+        shell: pwsh
+        run: |
+          $fixtureParent = Join-Path $env:RUNNER_TEMP 'bootstrap-fixture'
+          $fixture = Join-Path $fixtureParent 'vitasdk'
+          Copy-Item -Recurse stage $fixture
+          New-Item -ItemType Directory -Force (Join-Path $fixture 'etc') | Out-Null
+          [IO.File]::WriteAllText((Join-Path $fixture 'etc/pacman.conf'), "[options]`nArchitecture = x86_64-w64-mingw32 vita`n")
+          [IO.File]::WriteAllText((Join-Path $fixture 'version_info.txt'), "test`n")
+          [IO.File]::WriteAllText((Join-Path $fixture 'bin/arm-vita-eabi-gcc.exe'), "bootstrap contract`n")
+          $archive = Join-Path $env:RUNNER_TEMP 'vitasdk-bootstrap-test.tar.bz2'
+          & tar.exe -cjf $archive -C $fixtureParent vitasdk
+          if ($LASTEXITCODE -ne 0) { throw 'could not create bootstrap fixture' }
+          $digest = (Get-FileHash -Algorithm SHA256 $archive).Hash
+          ./bootstrap-vitasdk.ps1 `
+            -ArchivePath $archive `
+            -Sha256 $digest `
+            -InstallDirectory (Join-Path $env:RUNNER_TEMP 'installed-vitasdk')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vdpm-x86_64-w64-mingw32
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  collect:
+    needs: [prepare, build-unix, build-windows]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: vdpm-*
+          path: release
+          merge-multiple: true
+      - name: Verify complete release set
+        shell: bash
+        run: |
+          cp bootstrap-vitasdk.sh bootstrap-vitasdk.ps1 release/
+          expected=(
+            x86_64-linux-gnu
+            aarch64-linux-gnu
+            arm64-apple-darwin
+            x86_64-w64-mingw32
+          )
+          for host in "${expected[@]}"; do
+            archive="release/vdpm-${{ needs.prepare.outputs.version }}-$host.tar.bz2"
+            test -f "$archive"
+            scripts/validate-release-bundle.sh "$archive" "$host"
+            (cd release && sha256sum -c "$(basename "$archive").sha256")
+          done
+          (
+            cd release
+            sha256sum -- *.tar.bz2 bootstrap-vitasdk.sh bootstrap-vitasdk.ps1 |
+              LC_ALL=C sort -k2 > SHA256SUMS
+          )
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vdpm-release
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: [prepare, collect]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: vdpm-release
+          path: release
+      - name: Publish immutable component release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          tag=$GITHUB_REF_NAME
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
+            --draft --target "$GITHUB_SHA" --title "$tag" \
+            --notes "Verified vdpm package-manager bundles for $tag."
+          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" release/*
+          mkdir downloaded-release
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" \
+            --dir downloaded-release
+          diff -ru release downloaded-release
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false

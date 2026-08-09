@@ -15,6 +15,7 @@ function(vdpm_add_package_client install_dir)
 
     set(vdpm_source_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/..")
     set(deps_dir "${CMAKE_BINARY_DIR}/package-client-deps")
+    set(license_dir "${install_dir}/share/vdpm/licenses")
 
     find_program(MESON_EXECUTABLE meson REQUIRED)
     find_program(PACMAN_MAKE_EXECUTABLE NAMES gmake make REQUIRED)
@@ -212,10 +213,48 @@ function(vdpm_add_package_client install_dir)
         INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory ${install_dir}/bin
         COMMAND ${CMAKE_COMMAND} -E copy <BINARY_DIR>/pacman ${install_dir}/bin/pacman
         COMMAND ${CMAKE_COMMAND} -E copy <BINARY_DIR>/pacman-conf ${install_dir}/bin/pacman-conf
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${license_dir}
+        COMMAND ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/COPYING
+            ${license_dir}/pacman-GPL-2.0.txt
         UPDATE_DISCONNECTED ${VDPM_OFFLINE}
         )
 
-    add_custom_target(vdpm-package-client DEPENDS pacman-client)
+    ExternalProject_Get_Property(zlib-pacman SOURCE_DIR)
+    set(zlib_source_dir ${SOURCE_DIR})
+    ExternalProject_Get_Property(xz-pacman SOURCE_DIR)
+    set(xz_source_dir ${SOURCE_DIR})
+    ExternalProject_Get_Property(openssl-pacman SOURCE_DIR)
+    set(openssl_source_dir ${SOURCE_DIR})
+    ExternalProject_Get_Property(libarchive-pacman SOURCE_DIR)
+    set(libarchive_source_dir ${SOURCE_DIR})
+    ExternalProject_Get_Property(curl-pacman SOURCE_DIR)
+    set(curl_source_dir ${SOURCE_DIR})
+
+    add_custom_target(vdpm-package-client-licenses ALL
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${license_dir}
+        COMMAND ${CMAKE_COMMAND} -E copy ${zlib_source_dir}/LICENSE
+            ${license_dir}/zlib.txt
+        COMMAND ${CMAKE_COMMAND} -E copy ${xz_source_dir}/COPYING
+            ${license_dir}/xz-COPYING.txt
+        COMMAND ${CMAKE_COMMAND} -E copy ${xz_source_dir}/COPYING.0BSD
+            ${license_dir}/xz-0BSD.txt
+        COMMAND ${CMAKE_COMMAND} -E copy ${xz_source_dir}/COPYING.GPLv2
+            ${license_dir}/xz-GPL-2.0.txt
+        COMMAND ${CMAKE_COMMAND} -E copy ${xz_source_dir}/COPYING.GPLv3
+            ${license_dir}/xz-GPL-3.0.txt
+        COMMAND ${CMAKE_COMMAND} -E copy ${xz_source_dir}/COPYING.LGPLv2.1
+            ${license_dir}/xz-LGPL-2.1.txt
+        COMMAND ${CMAKE_COMMAND} -E copy ${openssl_source_dir}/LICENSE.txt
+            ${license_dir}/openssl-Apache-2.0.txt
+        COMMAND ${CMAKE_COMMAND} -E copy ${libarchive_source_dir}/COPYING
+            ${license_dir}/libarchive.txt
+        COMMAND ${CMAKE_COMMAND} -E copy ${curl_source_dir}/COPYING
+            ${license_dir}/curl.txt
+        DEPENDS zlib-pacman xz-pacman openssl-pacman libarchive-pacman
+            curl-pacman pacman-client)
+
+    add_custom_target(vdpm-package-client
+        DEPENDS pacman-client vdpm-package-client-licenses)
     add_custom_target(pacman-client-spike
         DEPENDS pacman-client
         COMMENT "Compatibility target; use vdpm-package-client")

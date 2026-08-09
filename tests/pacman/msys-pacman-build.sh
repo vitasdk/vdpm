@@ -68,6 +68,20 @@ meson compile -C "$build_directory"
 mkdir -p "$output_directory"
 cp "$build_directory/pacman.exe" "$output_directory/pacman.exe"
 cp /usr/bin/msys-2.0.dll "$output_directory/msys-2.0.dll"
+mkdir -p "$output_directory/licenses"
+cp "$source_directory/COPYING" \
+	"$output_directory/licenses/pacman-GPL-2.0.txt"
+for license_directory in \
+	/usr/share/licenses/msys2-runtime \
+	/usr/share/licenses/libarchive \
+	/usr/share/licenses/libcurl \
+	/usr/share/licenses/openssl
+do
+	if [[ -d $license_directory ]]; then
+		license_name=$(basename "$license_directory")
+		cp -R "$license_directory" "$output_directory/licenses/$license_name"
+	fi
+done
 
 mapfile -t imports < <(
 	objdump -p "$output_directory/pacman.exe" |
