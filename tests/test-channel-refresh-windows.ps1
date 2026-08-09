@@ -110,3 +110,4 @@ finally {
 }
 
 Write-Host "native signed Windows channel refresh contract passed"
+exit 0
