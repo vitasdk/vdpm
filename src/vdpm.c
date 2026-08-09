@@ -278,13 +278,41 @@ int main(int argc, char **argv)
 		force = 1;
 		++input;
 	}
-	if (command == COMMAND_REFRESH)
-		return fail("native channel refresh is not implemented yet");
-
 	root_environment = getenv("VITASDK");
 	root = normalized_root(root_environment);
 	if (!root)
 		return fail("VITASDK must be an absolute, non-root path");
+	if (command == COMMAND_REFRESH) {
+		if (argc - input > 1) {
+			free(root);
+			return fail("refresh accepts at most one channel");
+		}
+#ifdef _WIN32
+		free(root);
+		return fail("native channel refresh is not implemented yet");
+#else
+		{
+			char *refresh = join_path(root,
+				"bin/include/refresh-repositories.sh");
+			char *refresh_arguments[3];
+
+			if (access(refresh, X_OK) != 0) {
+				status = fail_path("channel refresh helper is not executable",
+					refresh);
+				free(refresh);
+				free(root);
+				return status;
+			}
+			refresh_arguments[0] = refresh;
+			refresh_arguments[1] = input < argc ? argv[input] : "stable";
+			refresh_arguments[2] = NULL;
+			status = run_process(refresh, refresh_arguments);
+			free(refresh);
+			free(root);
+			return status;
+		}
+#endif
+	}
 
 	pacman_environment = getenv("VDPM_PACMAN");
 	config_environment = getenv("VDPM_PACMAN_CONF");
@@ -385,7 +413,7 @@ int main(int argc, char **argv)
 			return fail("pacman requires at least one argument");
 		break;
 	case COMMAND_REFRESH:
-		/* Handled before package paths are initialized. */
+		/* Handled immediately after validating the SDK root. */
 		break;
 	}
 

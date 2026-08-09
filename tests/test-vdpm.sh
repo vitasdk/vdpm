@@ -13,13 +13,18 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "$sdk_root/bin" "$sdk_root/etc"
+mkdir -p "$sdk_root/bin/include" "$sdk_root/etc"
 cat > "$sdk_root/bin/pacman" <<'EOF'
 #!/usr/bin/env bash
 printf '%q ' "$@" >> "$VDPM_TEST_LOG"
 printf '\n' >> "$VDPM_TEST_LOG"
 EOF
 chmod +x "$sdk_root/bin/pacman"
+cat > "$sdk_root/bin/include/refresh-repositories.sh" <<'EOF'
+#!/usr/bin/env bash
+printf 'refresh %s\n' "$1" >> "$VDPM_TEST_LOG"
+EOF
+chmod +x "$sdk_root/bin/include/refresh-repositories.sh"
 printf '[options]\nArchitecture = test vita\n' > "$sdk_root/etc/pacman.conf"
 
 "${CC:-cc}" -std=c99 -Wall -Wextra -Werror \
@@ -37,6 +42,7 @@ run_vdpm list
 run_vdpm search image
 run_vdpm files libpng
 run_vdpm pacman -- --database --check
+run_vdpm refresh nightly
 
 common="--config $sdk_root/etc/pacman.conf --root $sdk_root --dbpath $sdk_root/var/lib/pacman --cachedir $sdk_root/var/cache/pacman/pkg --logfile $sdk_root/var/log/pacman.log"
 transaction_common="$common --noscriptlet --noconfirm --noprogressbar"
@@ -48,6 +54,7 @@ grep -Fqx -e "$query_common --query " "$arguments_log"
 grep -Fqx -e "$query_common --sync --search image " "$arguments_log"
 grep -Fqx -e "$query_common --query --list libpng " "$arguments_log"
 grep -Fqx -e "$query_common --database --check " "$arguments_log"
+grep -Fqx -e "refresh nightly" "$arguments_log"
 
 if run_vdpm install; then
 	printf 'empty install was unexpectedly accepted\n' >&2
