@@ -242,8 +242,12 @@ jobs:
         shell: bash
         run: |
           tag=$GITHUB_REF_NAME
+          release_kind=()
+          if [[ ${tag#v} == *-* ]]; then
+            release_kind+=(--prerelease)
+          fi
           gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
-            --draft --target "$GITHUB_SHA" --title "$tag" \
+            --draft "${release_kind[@]}" --target "$GITHUB_SHA" --title "$tag" \
             --notes "Verified vdpm package-manager bundles for $tag."
           gh release upload "$tag" --repo "$GITHUB_REPOSITORY" release/*
           mkdir downloaded-release
