@@ -1,19 +1,34 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(vdpm-channel C)
+project(vdpm C)
+
+option(BUILD_VDPM_FRONTEND "Build the native vdpm frontend" ON)
+option(BUILD_VDPM_CHANNEL "Build the signed-channel helper" ON)
+
+if(BUILD_VDPM_FRONTEND)
+    add_executable(vdpm vdpm.c)
+    target_compile_features(vdpm PRIVATE c_std_99)
+    install(TARGETS vdpm RUNTIME DESTINATION bin)
+endif()
 
 # The superbuild points OPENSSL_ROOT_DIR at its own static build and sets
 # OPENSSL_USE_STATIC_LIBS, so the SDK ships no dynamic private dependency.
 # Letting FindOpenSSL resolve the target also carries the platform specific
 # link requirements of a static libcrypto.
-find_package(OpenSSL REQUIRED)
+if(BUILD_VDPM_CHANNEL)
+    find_package(OpenSSL REQUIRED)
 
-add_executable(vdpm-channel vdpm-channel.c)
-target_compile_features(vdpm-channel PRIVATE c_std_99)
-target_link_libraries(vdpm-channel PRIVATE OpenSSL::Crypto)
-
-if(NOT MSVC)
-	target_compile_options(vdpm-channel PRIVATE -Wall -Wextra -Werror)
+    add_executable(vdpm-channel vdpm-channel.c)
+    target_compile_features(vdpm-channel PRIVATE c_std_99)
+    target_link_libraries(vdpm-channel PRIVATE OpenSSL::Crypto)
+    install(TARGETS vdpm-channel RUNTIME DESTINATION bin)
 endif()
 
-install(TARGETS vdpm-channel RUNTIME DESTINATION bin)
+if(NOT MSVC)
+    if(BUILD_VDPM_FRONTEND)
+        target_compile_options(vdpm PRIVATE -Wall -Wextra -Werror)
+    endif()
+    if(BUILD_VDPM_CHANNEL)
+        target_compile_options(vdpm-channel PRIVATE -Wall -Wextra -Werror)
+    endif()
+endif()
