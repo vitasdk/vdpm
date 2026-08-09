@@ -23,7 +23,7 @@ function Write-Utf8([string]$Path, [string]$Value) {
 if (Test-Path -LiteralPath $WorkDirectory) {
     Remove-Item -LiteralPath $WorkDirectory -Recurse -Force
 }
-$sdkRoot = Join-Path $WorkDirectory "VitaSDK ñ 日本語"
+$sdkRoot = Join-Path $WorkDirectory "VitaSDK with spaces"
 $fixtureRoot = Join-Path $WorkDirectory "channel fixture"
 $assetRoot = Join-Path $fixtureRoot "assets"
 New-Item -ItemType Directory -Force -Path $sdkRoot, $assetRoot | Out-Null
