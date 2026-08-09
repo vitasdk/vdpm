@@ -38,14 +38,16 @@ run_vdpm search image
 run_vdpm files libpng
 run_vdpm pacman -- --database --check
 
-common="--config $sdk_root/etc/pacman.conf --root $sdk_root --dbpath $sdk_root/var/lib/pacman --cachedir $sdk_root/var/cache/pacman/pkg --logfile $sdk_root/var/log/pacman.log --noscriptlet --noconfirm --noprogressbar"
-grep -Fqx -e "$common --sync zlib libpng " "$arguments_log"
-grep -Fqx -e "$common --remove zlib " "$arguments_log"
-grep -Fqx -e "$common --sync --sysupgrade " "$arguments_log"
-grep -Fqx -e "$common --query " "$arguments_log"
-grep -Fqx -e "$common --sync --search image " "$arguments_log"
-grep -Fqx -e "$common --query --list libpng " "$arguments_log"
-grep -Fqx -e "$common --database --check " "$arguments_log"
+common="--config $sdk_root/etc/pacman.conf --root $sdk_root --dbpath $sdk_root/var/lib/pacman --cachedir $sdk_root/var/cache/pacman/pkg --logfile $sdk_root/var/log/pacman.log"
+transaction_common="$common --noscriptlet --noconfirm --noprogressbar"
+query_common="$common --noconfirm --noprogressbar"
+grep -Fqx -e "$transaction_common --sync zlib libpng " "$arguments_log"
+grep -Fqx -e "$transaction_common --remove zlib " "$arguments_log"
+grep -Fqx -e "$transaction_common --sync --sysupgrade " "$arguments_log"
+grep -Fqx -e "$query_common --query " "$arguments_log"
+grep -Fqx -e "$query_common --sync --search image " "$arguments_log"
+grep -Fqx -e "$query_common --query --list libpng " "$arguments_log"
+grep -Fqx -e "$query_common --database --check " "$arguments_log"
 
 if run_vdpm install; then
 	printf 'empty install was unexpectedly accepted\n' >&2

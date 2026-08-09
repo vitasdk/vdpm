@@ -329,7 +329,9 @@ int main(int argc, char **argv)
 	append_argument(arguments, &argument_count, cache);
 	append_argument(arguments, &argument_count, "--logfile");
 	append_argument(arguments, &argument_count, log);
-	append_argument(arguments, &argument_count, "--noscriptlet");
+	if (command == COMMAND_INSTALL || command == COMMAND_REMOVE ||
+			command == COMMAND_UPGRADE)
+		append_argument(arguments, &argument_count, "--noscriptlet");
 	if (getenv("VDPM_NONINTERACTIVE") &&
 			strcmp(getenv("VDPM_NONINTERACTIVE"), "1") == 0) {
 		append_argument(arguments, &argument_count, "--noconfirm");

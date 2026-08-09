@@ -48,7 +48,6 @@ common_arguments=(
 	--dbpath "$VITASDK/var/lib/pacman"
 	--cachedir "$VITASDK/var/cache/pacman/pkg"
 	--logfile "$VITASDK/var/log/pacman.log"
-	--noscriptlet
 )
 if [[ ${VDPM_NONINTERACTIVE:-0} == 1 ]]; then
 	common_arguments+=(--noconfirm --noprogressbar)
@@ -98,17 +97,17 @@ case $command in
 		(( $# > 0 )) || die 'install requires at least one package'
 		install_arguments=(--sync)
 		(( force )) || install_arguments+=(--needed)
-		run_pacman "${install_arguments[@]}" "$@"
+		run_pacman --noscriptlet "${install_arguments[@]}" "$@"
 		;;
 	remove)
 		(( $# > 0 )) || die 'remove requires at least one package'
-		run_pacman --remove "$@"
+		run_pacman --noscriptlet --remove "$@"
 		;;
 	upgrade)
 		if (( $# > 0 )); then
-			run_pacman --sync "$@"
+			run_pacman --noscriptlet --sync "$@"
 		else
-			run_pacman --sync --sysupgrade
+			run_pacman --noscriptlet --sync --sysupgrade
 		fi
 		;;
 	list)
