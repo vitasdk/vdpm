@@ -4,6 +4,11 @@
 installed inside the SDK. Package state lives only below `$VITASDK`; the host
 package database and `/usr` are never used.
 
+The transaction frontend is implemented in portable C. On Windows it builds
+as a native `vdpm.exe` and starts the MSYS-ABI Pacman executable directly; it
+does not require Bash or link to libalpm. The Windows package-client runtime is
+limited to `$VITASDK/usr/bin/pacman.exe` and adjacent `msys-2.0.dll`.
+
 ```sh
 vdpm install zlib sdl2
 vdpm remove zlib
@@ -13,10 +18,19 @@ vdpm search image
 vdpm info sdl2
 vdpm files sdl2
 vdpm refresh nightly
+vdpm pacman -- --database --check
 ```
 
 The historical forms `vdpm PACKAGE...`, `vdpm -f PACKAGE...` and
 `vdpm -u PACKAGE...` remain available during migration.
+
+The native Windows contract is exercised by
+`tests/test-vdpm-windows.ps1`. With non-system directories removed from
+`PATH`, it builds `vdpm.exe` with MSVC and uses the historical install and
+remove forms to complete a real Pacman install/query/remove transaction. The
+signed `vdpm refresh` orchestration is still implemented by the Unix shell
+frontend and remains to be ported before the native Windows frontend replaces
+it completely.
 
 ## Repository trust
 
