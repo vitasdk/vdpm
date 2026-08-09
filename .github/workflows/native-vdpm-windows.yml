@@ -3,6 +3,7 @@ name: Native vdpm Windows smoke
 on:
   pull_request:
     paths:
+      - CMakeLists.txt
       - src/CMakeLists.txt
       - src/vdpm.c
       - tests/test-vdpm-windows.ps1
@@ -11,6 +12,7 @@ on:
     branches:
       - next
     paths:
+      - CMakeLists.txt
       - src/CMakeLists.txt
       - src/vdpm.c
       - tests/test-vdpm-windows.ps1

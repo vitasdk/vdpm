@@ -1,0 +1,24 @@
+name: MSYS pacman two-file smoke
+
+on:
+  pull_request:
+    paths:
+      - tests/pacman/msys-runtime-smoke.ps1
+      - .github/workflows/msys-pacman-smoke.yml
+  push:
+    branches:
+      - next
+    paths:
+      - tests/pacman/msys-runtime-smoke.ps1
+      - .github/workflows/msys-pacman-smoke.yml
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise pacman with only the MSYS runtime DLL
+        shell: pwsh
+        run: ./tests/pacman/msys-runtime-smoke.ps1

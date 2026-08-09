@@ -32,6 +32,24 @@ signed `vdpm refresh` orchestration is still implemented by the Unix shell
 frontend and remains to be ported before the native Windows frontend replaces
 it completely.
 
+## Package client build
+
+This repository owns the complete package-manager product: the `vdpm`
+frontend, the pinned Pacman/libalpm sources, their private dependencies,
+platform patches and transaction tests. A native Linux or macOS build is:
+
+```sh
+cmake -S . -B build -DBUILD_VDPM_PACKAGE_CLIENT=ON \
+  -DVDPM_PACKAGE_CLIENT_INSTALL_PREFIX="$PWD/stage"
+cmake --build build --target vdpm-package-client --parallel
+cmake --build build --target install
+```
+
+On Windows, `tests/pacman/msys-pacman-build.sh` builds the pinned Pacman under
+MSYS and `tests/pacman/msys-runtime-smoke.ps1` verifies the two-file runtime.
+VitaSDK `buildscripts` only selects a vdpm revision, invokes this interface and
+incorporates the resulting files into the SDK distribution.
+
 ## Repository trust
 
 `vdpm refresh` downloads a canonical channel manifest and detached Ed25519

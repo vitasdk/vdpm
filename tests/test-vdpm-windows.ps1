@@ -80,14 +80,14 @@ Copy-Item (Join-Path $extract "usr/bin/pacman.exe") $pacmanBin
 Copy-Item (Join-Path $extract "usr/bin/msys-2.0.dll") $pacmanBin
 
 Invoke-Checked "cmake.exe" @(
-    "-S", (Join-Path $repositoryRoot "src"),
+    "-S", $repositoryRoot,
     "-B", $build,
     "-DBUILD_VDPM_CHANNEL=OFF",
     "-DBUILD_VDPM_FRONTEND=ON",
     "-A", "x64"
 )
 Invoke-Checked "cmake.exe" @("--build", $build, "--config", "Release")
-Copy-Item (Join-Path $build "Release/vdpm.exe") $sdkBin
+Copy-Item (Join-Path $build "src/Release/vdpm.exe") $sdkBin
 
 Write-UnixText $configPath @(
     "[options]",

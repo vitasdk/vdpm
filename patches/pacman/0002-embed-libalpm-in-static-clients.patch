@@ -1,0 +1,101 @@
+Build the command-line clients without a shared libalpm in static mode.
+
+The buildstatic option already requests static variants of libalpm's external
+dependencies, but the client executables are still linked to a shared libalpm.
+Embed the private static libalpm object library in the clients when buildstatic
+is enabled and propagate its external dependencies to their final link. Keep
+the installed shared library, public headers and pkg-config metadata unchanged
+for normal builds.
+
+Based on pacman 7.1.0 commit 5683f8477a0afcc6b331766175a83445b2dcfe89.
+
+--- a/meson.build
++++ b/meson.build
+@@ -343,34 +343,42 @@ libalpm_a = static_library(
+   gnu_symbol_visibility : 'hidden',
+   dependencies : alpm_deps)
+ 
+-libalpm = library(
+-  'alpm',
+-  version : libalpm_version,
+-  objects: libalpm_a.extract_all_objects(recursive: true),
+-  include_directories : includes,
+-  dependencies : alpm_deps,
+-  install : true)
+-
+-install_headers(
+-  'lib/libalpm/alpm.h',
+-  'lib/libalpm/alpm_list.h')
+-
+-pkgconfig = import('pkgconfig')
+-pkgconfig.generate(
+-  libalpm,
+-  name : 'libalpm',
+-  description : 'Arch Linux package management library',
+-  version : libalpm_version,
+-  url : 'http://archlinux.org/pacman/',
+-  extra_cflags: [ '-D_FILE_OFFSET_BITS=64' ],
+-)
++if get_option('buildstatic')
++  libalpm_link = [libalpm_a]
++  client_deps = alpm_deps
++else
++  libalpm = library(
++    'alpm',
++    version : libalpm_version,
++    objects: libalpm_a.extract_all_objects(recursive: true),
++    include_directories : includes,
++    dependencies : alpm_deps,
++    install : true)
++
++  install_headers(
++    'lib/libalpm/alpm.h',
++    'lib/libalpm/alpm_list.h')
++
++  pkgconfig = import('pkgconfig')
++  pkgconfig.generate(
++    libalpm,
++    name : 'libalpm',
++    description : 'Arch Linux package management library',
++    version : libalpm_version,
++    url : 'http://archlinux.org/pacman/',
++    extra_cflags: [ '-D_FILE_OFFSET_BITS=64' ],
++  )
++
++  libalpm_link = [libalpm, libcommon]
++  client_deps = [libarchive]
++endif
+ 
+ pacman_bin = executable(
+   'pacman',
+   pacman_sources,
+   include_directories : includes,
+-  link_with : [libalpm, libcommon],
+-  dependencies : [libarchive],
++  link_with : libalpm_link,
++  dependencies : client_deps,
+   install : true,
+ )
+ 
+@@ -378,8 +386,8 @@ executable(
+   'pacman-conf',
+   pacman_conf_sources,
+   include_directories : includes,
+-  link_with : [libalpm, libcommon],
+-  dependencies : [libarchive],
++  link_with : libalpm_link,
++  dependencies : client_deps,
+   install : true,
+ )
+ 
+@@ -387,8 +395,8 @@ executable(
+   'testpkg',
+   testpkg_sources,
+   include_directories : includes,
+-  link_with : [libalpm],
+-  dependencies : [libarchive],
++  link_with : libalpm_link,
++  dependencies : client_deps,
+   install : true,
+ )
+ 

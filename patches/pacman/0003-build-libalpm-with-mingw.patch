@@ -1,0 +1,941 @@
+Build libalpm with the x86_64-w64-mingw32 toolchain.
+
+Keep the port scoped to the library used by VDPM. Replace Unix-only sandbox,
+scriptlet, syslog and mount probing paths on Windows; adapt the small set of
+filesystem calls needed by libalpm; and use libgnurx for regex/fnmatch support.
+Disk-space preflight and scriptlets remain deliberately unavailable in this
+spike and must not be enabled by the Windows frontend.
+
+Based on pacman 7.1.0 commit 5683f8477a0afcc6b331766175a83445b2dcfe89.
+
+index 1e4aaf1..2e678c4 100644
+--- a/lib/libalpm/add.c
++++ b/lib/libalpm/add.c
+@@ -426,7 +426,13 @@ static int commit_single_pkg(alpm_handle_t *handle, alpm_pkg_t *newpkg,
+ 	const char *pkgfile;
+ 	struct archive *archive;
+ 	struct archive_entry *entry;
+-	int fd, cwdfd;
++	int fd;
++#ifdef _WIN32
++	char cwd[PATH_MAX];
++	int have_cwd;
++#else
++	int cwdfd;
++#endif
+ 	struct stat buf;
+ 
+ 	ASSERT(trans != NULL, return -1);
+@@ -505,19 +511,28 @@ static int commit_single_pkg(alpm_handle_t *handle, alpm_pkg_t *newpkg,
+ 	}
+ 
+ 	/* save the cwd so we can restore it later */
++#ifdef _WIN32
++	have_cwd = getcwd(cwd, sizeof(cwd)) != NULL;
++	if(!have_cwd) {
++		_alpm_log(handle, ALPM_LOG_ERROR, _("could not get current working directory\n"));
++	}
++#else
+ 	OPEN(cwdfd, ".", O_RDONLY | O_CLOEXEC);
+ 	if(cwdfd < 0) {
+ 		_alpm_log(handle, ALPM_LOG_ERROR, _("could not get current working directory\n"));
+ 	}
++#endif
+ 
+ 	/* libarchive requires this for extracting hard links */
+ 	if(chdir(handle->root) != 0) {
+ 		_alpm_log(handle, ALPM_LOG_ERROR, _("could not change directory to %s (%s)\n"),
+ 				handle->root, strerror(errno));
+ 		_alpm_archive_read_free(archive);
++#ifndef _WIN32
+ 		if(cwdfd >= 0) {
+ 			close(cwdfd);
+ 		}
++#endif
+ 		close(fd);
+ 		return -1;
+ 	}
+@@ -565,6 +580,12 @@ static int commit_single_pkg(alpm_handle_t *handle, alpm_pkg_t *newpkg,
+ 	close(fd);
+ 
+ 	/* restore the old cwd if we have it */
++#ifdef _WIN32
++	if(have_cwd && chdir(cwd) != 0) {
++		_alpm_log(handle, ALPM_LOG_ERROR,
++				_("could not restore working directory (%s)\n"), strerror(errno));
++	}
++#else
+ 	if(cwdfd >= 0) {
+ 		if(fchdir(cwdfd) != 0) {
+ 			_alpm_log(handle, ALPM_LOG_ERROR,
+@@ -572,6 +593,7 @@ static int commit_single_pkg(alpm_handle_t *handle, alpm_pkg_t *newpkg,
+ 		}
+ 		close(cwdfd);
+ 	}
++#endif
+ 
+ 	if(errors) {
+ 		ret = -1;
+index 8d573d6..c083435 100644
+--- a/lib/libalpm/alpm.h
++++ b/lib/libalpm/alpm.h
+@@ -45,6 +45,12 @@ extern "C" {
+ 
+ #include <alpm_list.h>
+ 
++#ifdef _WIN32
++#define ALPM_PRINTF_FORMAT gnu_printf
++#else
++#define ALPM_PRINTF_FORMAT printf
++#endif
++
+ /** @addtogroup libalpm The libalpm Public API
+  *
+  *
+@@ -1517,7 +1523,7 @@ typedef void (*alpm_cb_log)(void *ctx, alpm_loglevel_t level, const char *fmt, v
+  * @return 0 on success, -1 on error (pm_errno is set accordingly)
+  */
+ int alpm_logaction(alpm_handle_t *handle, const char *prefix,
+-		const char *fmt, ...) __attribute__((format(printf, 3, 4)));
++		const char *fmt, ...) __attribute__((format(ALPM_PRINTF_FORMAT, 3, 4)));
+ 
+ /* End of libalpm_log */
+ /** @} */
+index d5f9738..8562e0e 100644
+--- a/lib/libalpm/be_local.c
++++ b/lib/libalpm/be_local.c
+@@ -556,7 +556,11 @@ static int local_db_populate(alpm_db_t *db)
+ 	if(dbdir == NULL) {
+ 		RET_ERR(db->handle, ALPM_ERR_DB_OPEN, -1);
+ 	}
++#ifdef _WIN32
++	if(stat(dbpath, &buf) != 0) {
++#else
+ 	if(fstat(dirfd(dbdir), &buf) != 0) {
++#endif
+ 		RET_ERR(db->handle, ALPM_ERR_DB_OPEN, -1);
+ 	}
+ 	db->status |= DB_STATUS_EXISTS;
+new file mode 100644
+index 0000000..37ad95d
+--- /dev/null
++++ b/lib/libalpm/diskspace-windows.c
+@@ -0,0 +1,22 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
++
++/* Windows disk-space support is deliberately disabled in the initial MinGW
++ * compile spike. VDPM does not enable CheckSpace. A production port must use
++ * GetDiskFreeSpaceExW here before enabling that option. */
++#include "diskspace.h"
++
++int _alpm_check_diskspace(alpm_handle_t *handle)
++{
++	(void)handle;
++	return 0;
++}
++
++int _alpm_check_downloadspace(alpm_handle_t *handle, const char *cachedir,
++		size_t num_files, const off_t *file_sizes)
++{
++	(void)handle;
++	(void)cachedir;
++	(void)num_files;
++	(void)file_sizes;
++	return 0;
++}
+index 73e4e83..9448226 100644
+--- a/lib/libalpm/diskspace.h
++++ b/lib/libalpm/diskspace.h
+@@ -43,6 +43,7 @@ enum mount_fsinfo {
+ 	MOUNT_FSINFO_FAIL,
+ };
+ 
++#ifndef _WIN32
+ typedef struct _alpm_mountpoint_t {
+ 	/* mount point information */
+ 	char *mount_dir;
+@@ -55,6 +56,7 @@ typedef struct _alpm_mountpoint_t {
+ 	enum mount_fsinfo fsinfo_loaded;
+ 	FSSTATSTYPE fsp;
+ } alpm_mountpoint_t;
++#endif
+ 
+ int _alpm_check_diskspace(alpm_handle_t *handle);
+ int _alpm_check_downloadspace(alpm_handle_t *handle, const char *cachedir,
+index 62c7379..434486a 100644
+--- a/lib/libalpm/dload.c
++++ b/lib/libalpm/dload.c
+@@ -24,14 +24,19 @@
+ #include <errno.h>
+ #include <string.h>
+ #include <unistd.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#include <sys/utime.h>
++#else
+ #include <sys/socket.h> /* setsockopt, SO_KEEPALIVE */
+ #include <sys/time.h>
+-#include <sys/types.h>
+-#include <sys/stat.h>
+ #include <sys/wait.h>
+ #include <signal.h>
+-#include <dirent.h>
+ #include <pwd.h>
++#endif
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <dirent.h>
+ 
+ #ifdef HAVE_NETINET_IN_H
+ #include <netinet/in.h> /* IPPROTO_TCP */
+@@ -84,7 +89,9 @@ static int finalize_download_file(const char *filename)
+                 return 1;
+ 	}
+ 	if(myuid == 0) {
++#ifndef _WIN32
+ 		ASSERT(chown(filename, 0, 0) != -1, return -1);
++#endif
+ 	}
+ 	ASSERT(chmod(filename, ~(_getumask()) & 0666) != -1, return -1);
+ 	return 0;
+@@ -102,7 +109,11 @@ static FILE *create_tempfile(struct dload_payload *payload, const char *localpat
+ 	MALLOC(randpath, len, RET_ERR(payload->handle, ALPM_ERR_MEMORY, NULL));
+ 	snprintf(randpath, len, "%salpmtmp.XXXXXX", localpath);
+ 	if((fd = mkstemp(randpath)) == -1 ||
++#ifdef _WIN32
++			chmod(randpath, ~(_getumask()) & 0666) ||
++#else
+ 			fchmod(fd, ~(_getumask()) & 0666) ||
++#endif
+ 			!(fp = fdopen(fd, payload->tempfile_openmode))) {
+ 		unlink(randpath);
+ 		close(fd);
+@@ -347,11 +358,16 @@ static int curl_gethost(const char *url, char *buffer, size_t buf_len)
+ static int utimes_long(const char *path, long seconds)
+ {
+ 	if(seconds != -1) {
++#ifdef _WIN32
++		struct _utimbuf times = { .actime = seconds, .modtime = seconds };
++		return _utime(path, &times);
++#else
+ 		struct timeval tv[2] = {
+ 			{ .tv_sec = seconds, },
+ 			{ .tv_sec = seconds, },
+ 		};
+ 		return utimes(path, tv);
++#endif
+ 	}
+ 	return 0;
+ }
+@@ -914,6 +930,7 @@ static int curl_download_internal(alpm_handle_t *handle,
+  * Returns 0 if a payload was actually downloaded
+  * Returns 1 if no files were downloaded and all errors were non-fatal
+  */
++#ifndef _WIN32
+ static int curl_download_internal_sandboxed(alpm_handle_t *handle,
+ 		alpm_list_t *payloads /* struct dload_payload */,
+ 		const char *localpath,
+@@ -1063,6 +1080,7 @@ static int curl_download_internal_sandboxed(alpm_handle_t *handle,
+ 	}
+ 	return ret;
+ }
++#endif
+ 
+ #endif
+ 
+@@ -1154,13 +1172,17 @@ static int finalize_download_locations(alpm_list_t *payloads, const char *localp
+ static void prepare_resumable_downloads(alpm_handle_t *handle, alpm_list_t *payloads,
+ 		const char *localpath)
+ {
++#ifndef _WIN32
+ 	struct passwd const *pw = NULL;
++#endif
+ 	ASSERT(handle != NULL, return);
+ 	ASSERT(payloads != NULL, return);
+ 	ASSERT(localpath != NULL, return);
++#ifndef _WIN32
+ 	if(_alpm_use_sandbox(handle)) {
+ 		ASSERT((pw = getpwnam(handle->sandboxuser)) != NULL, return);
+ 	}
++#endif
+ 	alpm_list_t *p;
+ 	for(p = payloads; p; p = p->next) {
+ 		struct dload_payload *payload = p->data;
+@@ -1187,9 +1209,11 @@ static void prepare_resumable_downloads(alpm_handle_t *handle, alpm_list_t *payl
+ 			FREE(src);
+ 			continue;
+ 		}
++#ifndef _WIN32
+ 		if(pw != NULL) {
+ 			ASSERT(chown(payload->tempfile_name, pw->pw_uid, pw->pw_gid), return);
+ 		}
++#endif
+ 		FREE(src);
+ 	}
+ }
+@@ -1210,11 +1234,15 @@ int _alpm_download(alpm_handle_t *handle,
+ 
+ 	if(handle->fetchcb == NULL) {
+ #ifdef HAVE_LIBCURL
++#ifndef _WIN32
+ 		if(_alpm_use_sandbox(handle)) {
+ 			ret = curl_download_internal_sandboxed(handle, payloads, temporary_localpath, &childsig);
+ 		} else {
++#endif
+ 			ret = curl_download_internal(handle, payloads);
++#ifndef _WIN32
+ 		}
++#endif
+ #else
+ 		RET_ERR(handle, ALPM_ERR_EXTERNAL_DOWNLOAD, -1);
+ #endif
+@@ -1293,7 +1321,9 @@ download_signature:
+ 
+ 	/* propagate after finalizing so .part files get copied over */
+ 	if(childsig != 0) {
++#ifndef _WIN32
+ 		kill(getpid(), childsig);
++#endif
+ 	}
+ 	if(finalize_ret != 0 && ret == 0) {
+ 		RET_ERR(handle, ALPM_ERR_RETRIEVE, -1);
+new file mode 100644
+index 0000000..c2fd51f
+--- /dev/null
++++ b/lib/libalpm/fnmatch-windows.c
+@@ -0,0 +1,115 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
++
++/* Windows has no fnmatch(3). Translate the flags-free subset used by libalpm
++ * to the POSIX regular expressions supplied by libgnurx. */
++#include <regex.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "fnmatch-windows.h"
++
++static const char *bracket_end(const char *cursor)
++{
++	if(*cursor == '!' || *cursor == '^') {
++		cursor++;
++	}
++	if(*cursor == ']') {
++		cursor++;
++	}
++
++	while(*cursor != '\0') {
++		if(*cursor == '\\' && cursor[1] != '\0') {
++			cursor += 2;
++			continue;
++		}
++		if(*cursor == '[' &&
++				(cursor[1] == ':' || cursor[1] == '.' || cursor[1] == '=')) {
++			char marker = cursor[1];
++			const char *inner = cursor + 2;
++			while(*inner != '\0' && !(inner[0] == marker && inner[1] == ']')) {
++				inner++;
++			}
++			if(*inner != '\0') {
++				cursor = inner + 2;
++				continue;
++			}
++		}
++		if(*cursor == ']') {
++			return cursor;
++		}
++		cursor++;
++	}
++
++	return NULL;
++}
++
++int alpm_fnmatch_windows(const char *pattern, const char *string, int flags)
++{
++	static const char regex_special[] = ".^$+(){}|\\";
++	size_t pattern_len;
++	char *expression;
++	char *output;
++	regex_t regex;
++	int result;
++
++	if(pattern == NULL || string == NULL || flags != 0) {
++		return FNM_NOMATCH;
++	}
++
++	pattern_len = strlen(pattern);
++	expression = malloc(pattern_len * 4 + 3);
++	if(expression == NULL) {
++		return FNM_NOMATCH;
++	}
++
++	output = expression;
++	*output++ = '^';
++	while(*pattern != '\0') {
++		if(*pattern == '*') {
++			*output++ = '.';
++			*output++ = '*';
++			pattern++;
++		} else if(*pattern == '?') {
++			*output++ = '.';
++			pattern++;
++		} else if(*pattern == '\\' && pattern[1] != '\0') {
++			pattern++;
++			if(strchr(regex_special, *pattern) != NULL ||
++					strchr("*?[]", *pattern) != NULL) {
++				*output++ = '\\';
++			}
++			*output++ = *pattern++;
++		} else if(*pattern == '[') {
++			const char *end = bracket_end(pattern + 1);
++			if(end == NULL) {
++				*output++ = '\\';
++				*output++ = *pattern++;
++				continue;
++			}
++			*output++ = *pattern++;
++			if(*pattern == '!' || *pattern == '^') {
++				*output++ = '^';
++				pattern++;
++			}
++			while(pattern <= end) {
++				*output++ = *pattern++;
++			}
++		} else {
++			if(strchr(regex_special, *pattern) != NULL) {
++				*output++ = '\\';
++			}
++			*output++ = *pattern++;
++		}
++	}
++	*output++ = '$';
++	*output = '\0';
++
++	result = regcomp(&regex, expression, REG_EXTENDED | REG_NOSUB);
++	free(expression);
++	if(result != 0) {
++		return FNM_NOMATCH;
++	}
++	result = regexec(&regex, string, 0, NULL, 0);
++	regfree(&regex);
++	return result == 0 ? 0 : FNM_NOMATCH;
++}
+new file mode 100644
+index 0000000..187e90d
+--- /dev/null
++++ b/lib/libalpm/fnmatch-windows.h
+@@ -0,0 +1,10 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
++
++#ifndef ALPM_FNMATCH_WINDOWS_H
++#define ALPM_FNMATCH_WINDOWS_H
++
++#define FNM_NOMATCH 1
++
++int alpm_fnmatch_windows(const char *pattern, const char *string, int flags);
++
++#endif
+index f3765e5..1c65b39 100644
+--- a/lib/libalpm/handle.c
++++ b/lib/libalpm/handle.c
+@@ -25,10 +25,14 @@
+ #include <string.h>
+ #include <limits.h>
+ #include <sys/types.h>
++#ifndef _WIN32
+ #include <syslog.h>
++#endif
+ #include <sys/stat.h>
+ #include <fcntl.h>
++#ifndef _WIN32
+ #include <pwd.h>
++#endif
+ 
+ /* libalpm */
+ #include "handle.h"
+@@ -76,10 +80,12 @@ void _alpm_handle_free(alpm_handle_t *handle)
+ 		fclose(handle->logstream);
+ 		handle->logstream = NULL;
+ 	}
++#ifndef _WIN32
+ 	if(handle->usesyslog) {
+ 		handle->usesyslog = 0;
+ 		closelog();
+ 	}
++#endif
+ 
+ #ifdef HAVE_LIBGPGME
+ 	FREELIST(handle->known_keys);
+@@ -605,6 +611,11 @@ int SYMEXPORT alpm_option_set_gpgdir(alpm_handle_t *handle, const char *gpgdir)
+ 
+ int SYMEXPORT alpm_option_set_sandboxuser(alpm_handle_t *handle, const char *sandboxuser)
+ {
++#ifdef _WIN32
++	CHECK_HANDLE(handle, return -1);
++	(void)sandboxuser;
++	RET_ERR(handle, ALPM_ERR_WRONG_ARGS, -1);
++#else
+ 	struct passwd const *pw = NULL;
+ 	CHECK_HANDLE(handle, return -1);
+ 	if(handle->sandboxuser) {
+@@ -623,11 +634,17 @@ int SYMEXPORT alpm_option_set_sandboxuser(alpm_handle_t *handle, const char *san
+ 
+ 	_alpm_log(handle, ALPM_LOG_DEBUG, "option 'sandboxuser' = %s\n", handle->sandboxuser);
+ 	return 0;
++#endif
+ }
+ 
+ int SYMEXPORT alpm_option_set_usesyslog(alpm_handle_t *handle, int usesyslog)
+ {
+ 	CHECK_HANDLE(handle, return -1);
++#ifdef _WIN32
++	if(usesyslog) {
++		RET_ERR(handle, ALPM_ERR_WRONG_ARGS, -1);
++	}
++#endif
+ 	handle->usesyslog = usesyslog;
+ 	return 0;
+ }
+index 594dad3..a07a8dd 100644
+--- a/lib/libalpm/log.c
++++ b/lib/libalpm/log.c
+@@ -21,7 +21,9 @@
+ #include <stdio.h>
+ #include <stdarg.h>
+ #include <errno.h>
++#ifndef _WIN32
+ #include <syslog.h>
++#endif
+ #include <time.h>
+ 
+ /* libalpm */
+@@ -38,7 +40,11 @@ static int _alpm_log_leader(FILE *f, const char *prefix)
+ 	char timestamp[length];
+ 
+ 	/* Use ISO-8601 date format */
+-	strftime(timestamp,length,"%FT%T%z", tm);
++#ifdef _WIN32
++	strftime(timestamp, length, "%Y-%m-%dT%H:%M:%S", tm);
++#else
++	strftime(timestamp, length, "%FT%T%z", tm);
++#endif
+ 	return fprintf(f, "[%s] [%s] ", timestamp, prefix);
+ }
+ 
+@@ -76,6 +82,7 @@ int SYMEXPORT alpm_logaction(alpm_handle_t *handle, const char *prefix,
+ 
+ 	va_start(args, fmt);
+ 
++#ifndef _WIN32
+ 	if(handle->usesyslog) {
+ 		/* we can't use a va_list more than once, so we need to copy it
+ 		 * so we can use the original when calling vfprintf below. */
+@@ -84,6 +91,7 @@ int SYMEXPORT alpm_logaction(alpm_handle_t *handle, const char *prefix,
+ 		vsyslog(LOG_WARNING, fmt, args_syslog);
+ 		va_end(args_syslog);
+ 	}
++#endif
+ 
+ 	if(handle->logstream) {
+ 		if(_alpm_log_leader(handle->logstream, prefix) < 0
+index 8e55e3e..23a9e4b 100644
+--- a/lib/libalpm/log.h
++++ b/lib/libalpm/log.h
+@@ -25,6 +25,6 @@
+ #define ALPM_CALLER_PREFIX "ALPM"
+ 
+ void _alpm_log(alpm_handle_t *handle, alpm_loglevel_t flag,
+-		const char *fmt, ...) __attribute__((format(printf,3,4)));
++		const char *fmt, ...) __attribute__((format(ALPM_PRINTF_FORMAT,3,4)));
+ 
+ #endif /* ALPM_LOG_H */
+index c2c605f..afd7bb3 100644
+--- a/lib/libalpm/meson.build
++++ b/lib/libalpm/meson.build
+@@ -10,7 +10,7 @@ libalpm_sources = files('''
+   conflict.h conflict.c
+   db.h db.c
+   deps.h deps.c
+-  diskspace.h diskspace.c
++  diskspace.h
+   dload.h dload.c
+   error.c
+   filelist.h filelist.c
+@@ -24,12 +24,22 @@ libalpm_sources = files('''
+   pkghash.h pkghash.c
+   rawstr.c
+   remove.h remove.c
+-  sandbox.h sandbox.c
+-  sandbox_fs.h sandbox_fs.c
+-  sandbox_syscalls.h sandbox_syscalls.c
++  sandbox.h
++  sandbox_fs.h
++  sandbox_syscalls.h
+   signing.c signing.h
+   sync.h sync.c
+   trans.h trans.c
+   util.h util.c
+   version.c
+ '''.split())
++
++if host_machine.system() == 'windows'
++  libalpm_sources += files(
++    'diskspace-windows.c',
++    'fnmatch-windows.c',
++    'sandbox-windows.c',
++  )
++else
++  libalpm_sources += files('diskspace.c', 'sandbox.c', 'sandbox_fs.c', 'sandbox_syscalls.c')
++endif
+index a7bccde..b05fd9f 100644
+--- a/lib/libalpm/package.c
++++ b/lib/libalpm/package.c
+@@ -302,7 +302,7 @@ int SYMEXPORT alpm_pkg_get_sig(alpm_pkg_t *pkg, unsigned char **sig, size_t *sig
+ 		}
+ 		err = _alpm_read_file(sigpath, sig, sig_len);
+ 		if(err == ALPM_ERR_OK) {
+-			_alpm_log(pkg->handle, ALPM_LOG_DEBUG, "found detached signature %s with size %ld\n",
++			_alpm_log(pkg->handle, ALPM_LOG_DEBUG, "found detached signature %s with size %zu\n",
+ 				sigpath, *sig_len);
+ 		} else {
+ 			GOTO_ERR(pkg->handle, err, cleanup);
+new file mode 100644
+index 0000000..f2bfd5a
+--- /dev/null
++++ b/lib/libalpm/sandbox-windows.c
+@@ -0,0 +1,24 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
++
++/* Windows has no Unix user or process sandbox. VDPM downloads only from URLs
++ * selected by its verified channel manifest and never configures DownloadUser. */
++#include <stdarg.h>
++
++#include "alpm.h"
++#include "sandbox.h"
++
++bool _alpm_use_sandbox(alpm_handle_t *handle)
++{
++	(void)handle;
++	return false;
++}
++
++int alpm_sandbox_setup_child(alpm_handle_t *handle, const char *sandboxuser,
++		const char *sandbox_path, bool restrict_syscalls)
++{
++	(void)handle;
++	(void)sandboxuser;
++	(void)sandbox_path;
++	(void)restrict_syscalls;
++	return -1;
++}
+index f2230e2..0a48fb9 100644
+--- a/lib/libalpm/sandbox.h
++++ b/lib/libalpm/sandbox.h
+@@ -38,7 +38,7 @@ typedef struct {
+ 
+ /* Sandbox callbacks */
+ 
+-__attribute__((format(printf, 3, 0)))
++__attribute__((format(ALPM_PRINTF_FORMAT, 3, 0)))
+ void _alpm_sandbox_cb_log(void *ctx, alpm_loglevel_t level, const char *fmt, va_list args);
+ 
+ void _alpm_sandbox_cb_dl(void *ctx, const char *filename, alpm_download_event_type_t event, void *data);
+index c8db3b1..c0386eb 100644
+--- a/lib/libalpm/sync.c
++++ b/lib/libalpm/sync.c
+@@ -1138,8 +1138,8 @@ static int check_pkg_matches_db(alpm_pkg_t *spkg, alpm_pkg_t *pkgfile)
+ 	}
+ 	if(spkg->isize != pkgfile->isize) {
+ 		_alpm_log(handle, ALPM_LOG_DEBUG,
+-				"internal package install size mismatch, expected: '%ld', actual: '%ld'\n",
+-				spkg->isize, pkgfile->isize);
++				"internal package install size mismatch, expected: '%jd', actual: '%jd'\n",
++				(intmax_t)spkg->isize, (intmax_t)pkgfile->isize);
+ 		error = 1;
+ 	}
+ 
+index a545a03..94bad35 100644
+--- a/lib/libalpm/trans.c
++++ b/lib/libalpm/trans.c
+@@ -304,6 +304,7 @@ void _alpm_trans_free(alpm_trans_t *trans)
+ 	FREE(trans);
+ }
+ 
++#ifndef _WIN32
+ /* A cheap grep for text files, returns 1 if a substring
+  * was found in the text file fn, 0 if it wasn't
+  */
+@@ -333,10 +334,19 @@ static int grep(const char *fn, const char *needle)
+ 	fclose(fp);
+ 	return 0;
+ }
++#endif
+ 
+ int _alpm_runscriptlet(alpm_handle_t *handle, const char *filepath,
+ 		const char *script, const char *ver, const char *oldver, int is_archive)
+ {
++#ifdef _WIN32
++	(void)filepath;
++	(void)script;
++	(void)ver;
++	(void)oldver;
++	(void)is_archive;
++	RET_ERR(handle, ALPM_ERR_TRANS_ABORT, -1);
++#else
+ 	char arg0[PATH_MAX], arg1[3], cmdline[PATH_MAX];
+ 	char *argv[] = { arg0, arg1, cmdline, NULL };
+ 	char *tmpdir, *scriptfn = NULL, *scriptpath;
+@@ -422,6 +432,7 @@ cleanup:
+ 	free(scriptfn);
+ 	free(tmpdir);
+ 	return retval;
++#endif
+ }
+ 
+ int SYMEXPORT alpm_trans_get_flags(alpm_handle_t *handle)
+index 6739161..c8aa3a7 100644
+--- a/lib/libalpm/util.c
++++ b/lib/libalpm/util.c
+@@ -30,14 +30,21 @@
+ #include <time.h>
+ #include <errno.h>
+ #include <limits.h>
++#ifndef _WIN32
+ #include <sys/wait.h>
+ #include <sys/socket.h>
+-#include <sys/types.h>
+-#include <fcntl.h>
+-#include <fnmatch.h>
+ #include <poll.h>
+ #include <pwd.h>
+ #include <signal.h>
++#endif
++#include <sys/types.h>
++#include <fcntl.h>
++#ifdef _WIN32
++#include "fnmatch-windows.h"
++#define fnmatch alpm_fnmatch_windows
++#else
++#include <fnmatch.h>
++#endif
+ 
+ /* libarchive */
+ #include <archive.h>
+@@ -169,7 +176,11 @@ int _alpm_copyfile(const char *src, const char *dest)
+ 		goto cleanup;
+ 	}
+ 
++#ifdef _WIN32
++	if(fstat(in, &st) || chmod(dest, st.st_mode)) {
++#else
+ 	if(fstat(in, &st) || fchmod(out, st.st_mode)) {
++#endif
+ 		goto cleanup;
+ 	}
+ 
+@@ -341,7 +352,13 @@ int _alpm_unpack(alpm_handle_t *handle, const char *path, const char *prefix,
+ 	struct archive *archive;
+ 	struct archive_entry *entry;
+ 	struct stat buf;
+-	int fd, cwdfd;
++	int fd;
++#ifdef _WIN32
++	char cwd[PATH_MAX];
++	int have_cwd = 0;
++#else
++	int cwdfd;
++#endif
+ 
+ 	fd = _alpm_open_archive(handle, path, &buf, &archive, ALPM_ERR_PKG_OPEN);
+ 	if(fd < 0) {
+@@ -351,10 +368,18 @@ int _alpm_unpack(alpm_handle_t *handle, const char *path, const char *prefix,
+ 	oldmask = umask(0022);
+ 
+ 	/* save the cwd so we can restore it later */
++#ifdef _WIN32
++	if(getcwd(cwd, sizeof(cwd)) != NULL) {
++		have_cwd = 1;
++	} else {
++		_alpm_log(handle, ALPM_LOG_ERROR, _("could not get current working directory\n"));
++	}
++#else
+ 	OPEN(cwdfd, ".", O_RDONLY | O_CLOEXEC);
+ 	if(cwdfd < 0) {
+ 		_alpm_log(handle, ALPM_LOG_ERROR, _("could not get current working directory\n"));
+ 	}
++#endif
+ 
+ 	/* just in case our cwd was removed in the upgrade operation */
+ 	if(chdir(prefix) != 0) {
+@@ -425,6 +450,12 @@ cleanup:
+ 	umask(oldmask);
+ 	_alpm_archive_read_free(archive);
+ 	close(fd);
++#ifdef _WIN32
++	if(have_cwd && chdir(cwd) != 0) {
++		_alpm_log(handle, ALPM_LOG_ERROR,
++				_("could not restore working directory (%s)\n"), strerror(errno));
++	}
++#else
+ 	if(cwdfd >= 0) {
+ 		if(fchdir(cwdfd) != 0) {
+ 			_alpm_log(handle, ALPM_LOG_ERROR,
+@@ -432,6 +463,7 @@ cleanup:
+ 		}
+ 		close(cwdfd);
+ 	}
++#endif
+ 
+ 	return ret;
+ }
+@@ -477,6 +509,7 @@ ssize_t _alpm_files_in_directory(alpm_handle_t *handle, const char *path,
+ 	return files;
+ }
+ 
++#ifndef _WIN32
+ static int should_retry(int errnum)
+ {
+ 	return errnum == EAGAIN
+@@ -836,6 +869,27 @@ int _alpm_ldconfig(alpm_handle_t *handle)
+ 
+ 	return 0;
+ }
++#else
++void _alpm_reset_signals(void)
++{
++}
++
++int _alpm_run_chroot(alpm_handle_t *handle, const char *cmd, char *const argv[],
++		_alpm_cb_io in_cb, void *in_ctx)
++{
++	(void)cmd;
++	(void)argv;
++	(void)in_cb;
++	(void)in_ctx;
++	RET_ERR(handle, ALPM_ERR_TRANS_ABORT, -1);
++}
++
++int _alpm_ldconfig(alpm_handle_t *handle)
++{
++	(void)handle;
++	return 0;
++}
++#endif
+ 
+ /** Helper function for comparing strings using the alpm "compare func"
+  * signature.
+@@ -961,6 +1015,7 @@ char *_alpm_download_dir_setup(alpm_handle_t *handle, const char *dir)
+ 	char *newdir = NULL;
+ 	ASSERT(dir != NULL, RET_ERR(handle, ALPM_ERR_WRONG_ARGS, NULL));
+ 
++#ifndef _WIN32
+ 	if(_alpm_use_sandbox(handle)) {
+ 		struct passwd const *pw = NULL;
+ 		errno = 0;
+@@ -1001,7 +1056,9 @@ char *_alpm_download_dir_setup(alpm_handle_t *handle, const char *dir)
+ 
+ 		newdir[newdirlen-2] = '/';
+ 		newdir[newdirlen-1] = '\0';
+-	} else {
++	} else
++#endif
++	{
+ 		/* we are not using sandbox features, download directly to the current directory */
+ 		STRDUP(newdir, dir, return NULL);
+ 	}
+@@ -1476,9 +1533,11 @@ int _alpm_access(alpm_handle_t *handle, const char *dir, const char *file, int a
+ 	size_t len = 0;
+ 	int ret = 0;
+ 
++#ifndef _WIN32
+ 	int flag = 0;
+ #ifdef AT_SYMLINK_NOFOLLOW
+ 	flag |= AT_SYMLINK_NOFOLLOW;
++#endif
+ #endif
+ 
+ 	if(dir) {
+@@ -1488,11 +1547,19 @@ int _alpm_access(alpm_handle_t *handle, const char *dir, const char *file, int a
+ 		CALLOC(check_path, len, sizeof(char), RET_ERR(handle, ALPM_ERR_MEMORY, -1));
+ 		snprintf(check_path, len, "%s%s", dir, file);
+ 
++#ifdef _WIN32
++		ret = access(check_path, amode);
++#else
+ 		ret = faccessat(AT_FDCWD, check_path, amode, flag);
++#endif
+ 		free(check_path);
+ 	} else {
+ 		dir = "";
++#ifdef _WIN32
++		ret = access(file, amode);
++#else
+ 		ret = faccessat(AT_FDCWD, file, amode, flag);
++#endif
+ 	}
+ 
+ 	if(ret != 0) {
+index 1e8bd8f..6da758d 100644
+--- a/meson.build
++++ b/meson.build
+@@ -152,7 +152,9 @@ foreach sym : [
+     'swprintf',
+     'tcflush',
+   ]
+-  have = cc.has_function(sym, args : '-D_GNU_SOURCE')
++  have = cc.has_function(sym,
++                         prefix : '#include <string.h>',
++                         args : '-D_GNU_SOURCE')
+   if have
+     conf.set10('HAVE_' + sym.to_upper(), have)
+   endif
+@@ -333,6 +335,9 @@ libcommon = static_library(
+   install : false)
+ 
+ alpm_deps = [crypto_provider, libarchive, libcurl, libintl, libseccomp, gpgme]
++if host_machine.system() == 'windows'
++  alpm_deps += cc.find_library('regex', required : true)
++endif
+ 
+ libalpm_a = static_library(
+   'alpm_objlib',
+index d462d8d..e5e7e6e 100644
+--- a/src/common/util-common.h
++++ b/src/common/util-common.h
+@@ -21,8 +21,24 @@
+ #define PM_UTIL_COMMON_H
+ 
+ #include <stdio.h>
++#include <stdlib.h>
++#include <limits.h>
+ #include <sys/stat.h> /* struct stat */
+ 
++#ifdef _WIN32
++#include <direct.h>
++#define lstat stat
++#define mkdir(path, mode) _mkdir(path)
++#define getuid() ((uid_t)1)
++#define realpath(path, resolved) _fullpath((resolved), (path), PATH_MAX)
++#ifndef NAME_MAX
++#define NAME_MAX 255
++#endif
++#ifndef O_CLOEXEC
++#define O_CLOEXEC 0
++#endif
++#endif
++
+ char *hex_representation(const unsigned char *bytes, size_t size);
+ const char *mbasename(const char *path);
+ char *mdirname(const char *path);
+@@ -40,6 +56,12 @@ size_t strtrim(char *str);
+ char *strndup(const char *s, size_t n);
+ #endif
+ 
++#ifndef HAVE_STRSEP
++char *strsep(char **str, const char *delims);
++#endif
++
++#ifndef ARRAYSIZE
+ #define ARRAYSIZE(a) (sizeof (a) / sizeof (a[0]))
++#endif
+ 
+ #endif /* PM_UTIL_COMMON_H */

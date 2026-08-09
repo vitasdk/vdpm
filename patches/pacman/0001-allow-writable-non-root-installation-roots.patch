@@ -1,0 +1,69 @@
+Allow an unprivileged user to manage a writable alternate root.
+
+VitaSDK installs entirely below a user-selected directory and does not manage
+host files, users or services. Keep the normal root requirement for `/` and
+for alternate roots the caller cannot write. When extracting as a non-root
+user, preserve the package permissions but let the filesystem assign the
+caller's UID and GID instead of attempting a privileged chown.
+
+MSYS has no Unix privilege boundary, and the private runtime maps the SDK
+directory itself to POSIX `/`. There, omit the Unix root-user check just as the
+MSYS2 port does; the process has only the invoking Windows user's filesystem
+rights and extraction rejects paths that user cannot write.
+
+Based on pacman 7.1.0 commit 5683f8477a0afcc6b331766175a83445b2dcfe89.
+
+--- a/lib/libalpm/add.c
++++ b/lib/libalpm/add.c
+@@ -115,12 +115,15 @@ static int perform_extraction(alpm_handle_t *handle, struct archive *archive,
+ {
+ 	int ret;
+ 	struct archive *archive_writer;
+-	const int archive_flags = ARCHIVE_EXTRACT_OWNER |
+-	                          ARCHIVE_EXTRACT_PERM |
+-	                          ARCHIVE_EXTRACT_TIME |
+-	                          ARCHIVE_EXTRACT_UNLINK |
+-	                          ARCHIVE_EXTRACT_XATTR |
+-	                          ARCHIVE_EXTRACT_SECURE_SYMLINKS;
++	int archive_flags = ARCHIVE_EXTRACT_OWNER |
++	                    ARCHIVE_EXTRACT_PERM |
++	                    ARCHIVE_EXTRACT_TIME |
++	                    ARCHIVE_EXTRACT_UNLINK |
++	                    ARCHIVE_EXTRACT_XATTR |
++	                    ARCHIVE_EXTRACT_SECURE_SYMLINKS;
++	if(handle->user != 0) {
++		archive_flags &= ~ARCHIVE_EXTRACT_OWNER;
++	}
+ 
+ 	archive_entry_set_pathname(entry, filename);
+ 
+--- a/src/pacman/pacman.c
++++ b/src/pacman/pacman.c
+@@ -1168,6 +1168,18 @@ static void cl_to_log(int argc, char *argv[])
+ 	}
+ }
+ 
++static int has_writable_alternate_root(void)
++{
++#if defined(__MSYS__) || defined(__CYGWIN__)
++	return 1;
++#else
++	if(config->rootdir == NULL || strcmp(config->rootdir, "/") == 0) {
++		return 0;
++	}
++	return access(config->rootdir, W_OK | X_OK) == 0;
++#endif
++}
++
+ /** Main function.
+  * @param argc
+  * @param argv
+@@ -1221,7 +1228,7 @@ int main(int argc, char *argv[])
+ 	}
+ 
+ 	/* check if we have sufficient permission for the requested operation */
+-	if(myuid > 0 && needs_root()) {
++	if(myuid > 0 && needs_root() && !has_writable_alternate_root()) {
+ 		pm_printf(ALPM_LOG_ERROR, _("you cannot perform this operation unless you are root.\n"));
+ 		cleanup(EXIT_FAILURE);
+ 	}

@@ -1,0 +1,66 @@
+name: Patched MSYS pacman source build
+
+on:
+  pull_request:
+    paths:
+      - .gitattributes
+      - CMakeLists.txt
+      - cmake/PackageClient.cmake
+      - cmake/PackageClientVersions.cmake
+      - patches/pacman/**
+      - tests/pacman/msys-pacman-build.sh
+      - tests/pacman/msys-runtime-smoke.ps1
+      - .github/workflows/msys-pacman-source.yml
+  push:
+    branches:
+      - next
+    paths:
+      - .gitattributes
+      - CMakeLists.txt
+      - cmake/PackageClient.cmake
+      - cmake/PackageClientVersions.cmake
+      - patches/pacman/**
+      - tests/pacman/msys-pacman-build.sh
+      - tests/pacman/msys-runtime-smoke.ps1
+      - .github/workflows/msys-pacman-source.yml
+  workflow_dispatch:
+
+jobs:
+  build-and-transact:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: MSYS
+          update: true
+          install: >-
+            base-devel
+            git
+            gcc
+            meson
+            ninja
+            pkgconf
+            gettext-devel
+            heimdal-devel
+            libarchive-devel
+            libcurl-devel
+            libsqlite-devel
+            libunistring-devel
+            openssl-devel
+      - name: Build patched pacman 7.1
+        shell: msys2 {0}
+        run: >-
+          ./tests/pacman/msys-pacman-build.sh
+          "$(cygpath -u "$RUNNER_TEMP")/vitasdk-pacman"
+      - name: Exercise the built two-file runtime
+        shell: pwsh
+        run: |
+          ./tests/pacman/msys-runtime-smoke.ps1 `
+            -WorkDirectory (Join-Path $env:RUNNER_TEMP "vitasdk-ñ-日本語 path") `
+            -FixtureTar (Join-Path '${{ steps.msys2.outputs.msys2-location }}' 'usr/bin/bsdtar.exe') `
+            -PacmanExecutable (Join-Path $env:RUNNER_TEMP "vitasdk-pacman/pacman.exe") `
+            -RuntimeDll (Join-Path $env:RUNNER_TEMP "vitasdk-pacman/msys-2.0.dll") `
+            -Extended

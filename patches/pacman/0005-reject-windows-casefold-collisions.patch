@@ -1,0 +1,134 @@
+Reject package paths that collide on case-insensitive Windows filesystems.
+
+Libalpm compares package paths byte-for-byte. On Windows, two distinct archive
+members such as Collision.h and collision.h therefore pass the conflict check
+but address the same file; extraction silently lets one replace the other.
+
+For Windows builds, convert each UTF-8 package path to UTF-16 once, sort a
+temporary view with CompareStringOrdinal's case-insensitive ordering, and
+reject adjacent equivalents before the package enters a transaction. This
+uses Windows' own Unicode comparison rather than an ASCII-only approximation.
+
+Based on pacman 7.1.0 commit 5683f8477a0afcc6b331766175a83445b2dcfe89.
+
+--- a/lib/libalpm/be_package.c
++++ b/lib/libalpm/be_package.c
+@@ -25,6 +25,9 @@
+ #include <sys/stat.h>
+ #include <fcntl.h>
+ #include <limits.h>
++#if defined(__MSYS__) || defined(__CYGWIN__) || defined(_WIN32)
++#include <windows.h>
++#endif
+ 
+ /* libarchive */
+ #include <archive.h>
+@@ -47,6 +50,92 @@ struct package_changelog {
+ 	int fd;
+ };
+ 
++#if defined(__MSYS__) || defined(__CYGWIN__) || defined(_WIN32)
++struct casefold_path {
++	const char *utf8;
++	wchar_t *wide;
++};
++
++static int casefold_path_cmp(const void *left, const void *right)
++{
++	const struct casefold_path *a = left;
++	const struct casefold_path *b = right;
++	int result = CompareStringOrdinal(a->wide, -1, b->wide, -1, TRUE);
++
++	if(result == CSTR_LESS_THAN) {
++		return -1;
++	}
++	if(result == CSTR_GREATER_THAN) {
++		return 1;
++	}
++	return strcmp(a->utf8, b->utf8);
++}
++
++static int filelist_has_casefold_collision(alpm_handle_t *handle,
++		const alpm_filelist_t *filelist)
++{
++	struct casefold_path *paths;
++	size_t i;
++	int ret = 0;
++
++	if(filelist->count < 2) {
++		return 0;
++	}
++	paths = calloc(filelist->count, sizeof(struct casefold_path));
++	if(paths == NULL) {
++		handle->pm_errno = ALPM_ERR_MEMORY;
++		return -1;
++	}
++
++	for(i = 0; i < filelist->count; ++i) {
++		const char *name = filelist->files[i].name;
++		int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
++				name, -1, NULL, 0);
++		paths[i].utf8 = name;
++		if(length <= 0) {
++			_alpm_log(handle, ALPM_LOG_ERROR,
++					_("package path is not valid UTF-8: %s\n"), name);
++			ret = 1;
++			break;
++		}
++		paths[i].wide = calloc((size_t)length, sizeof(wchar_t));
++		if(paths[i].wide == NULL) {
++			handle->pm_errno = ALPM_ERR_MEMORY;
++			ret = -1;
++			break;
++		}
++		if(MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, name, -1,
++				paths[i].wide, length) == 0) {
++			_alpm_log(handle, ALPM_LOG_ERROR,
++					_("package path is not valid UTF-8: %s\n"), name);
++			ret = 1;
++			break;
++		}
++	}
++
++	if(ret == 0) {
++		qsort(paths, filelist->count, sizeof(struct casefold_path),
++				casefold_path_cmp);
++		for(i = 1; i < filelist->count; ++i) {
++			if(CompareStringOrdinal(paths[i - 1].wide, -1,
++					paths[i].wide, -1, TRUE) == CSTR_EQUAL) {
++				_alpm_log(handle, ALPM_LOG_ERROR,
++						_("package paths collide on Windows: %s and %s\n"),
++						paths[i - 1].utf8, paths[i].utf8);
++				ret = 1;
++				break;
++			}
++		}
++	}
++
++	for(i = 0; i < filelist->count; ++i) {
++		free(paths[i].wide);
++	}
++	free(paths);
++	return ret;
++}
++#endif
++
+ /**
+  * Open a package changelog for reading. Similar to fopen in functionality,
+  * except that the returned 'file stream' is from an archive.
+@@ -671,6 +760,15 @@ alpm_pkg_t *_alpm_pkg_load_internal(alpm_handle_t *handle,
+ 					"sorting package filelist for %s\n", pkgfile);
+ 
+ 			_alpm_filelist_sort(&newpkg->files);
++#if defined(__MSYS__) || defined(__CYGWIN__) || defined(_WIN32)
++			ret = filelist_has_casefold_collision(handle, &newpkg->files);
++			if(ret < 0) {
++				goto error;
++			}
++			if(ret > 0) {
++				goto pkg_invalid;
++			}
++#endif
+ 		}
+ 		newpkg->infolevel |= INFRQ_FILES;
+ 	}

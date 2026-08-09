@@ -1,0 +1,46 @@
+Initialize the process locale even when gettext is disabled.
+
+Pacman currently places setlocale() inside ENABLE_NLS along with the gettext
+setup. A static client built with -Di18n=false therefore remains in the ASCII
+C application locale. Libarchive then rejects UTF-8 package paths even though
+the MSYS runtime uses UTF-8 for its own Windows filename conversion.
+
+Locale initialization and message translation are independent concerns. Keep
+setlocale() and the call site unconditional while retaining gettext itself
+behind ENABLE_NLS.
+
+Based on pacman 7.1.0 commit 5683f8477a0afcc6b331766175a83445b2dcfe89.
+
+--- a/src/pacman/pacman.c
++++ b/src/pacman/pacman.c
+@@ -259,18 +259,18 @@ static void version(void)
+ /** Sets up gettext localization. Safe to call multiple times.
+  */
+ /* Inspired by the monotone function localize_monotone. */
+-#if defined(ENABLE_NLS)
+ static void localize(void)
+ {
+ 	static int init = 0;
+ 	if(!init) {
+ 		setlocale(LC_ALL, "");
++#if defined(ENABLE_NLS)
+ 		bindtextdomain(PACKAGE, LOCALEDIR);
+ 		textdomain(PACKAGE);
++#endif
+ 		init = 1;
+ 	}
+ }
+-#endif
+ 
+ /** Set user agent environment variable.
+  */
+@@ -1182,9 +1182,7 @@ int main(int argc, char *argv[])
+ 	install_segv_handler();
+ 
+ 	/* i18n init */
+-#if defined(ENABLE_NLS)
+ 	localize();
+-#endif
+ 
+ 	/* set user agent for downloading */
+ 	setuseragent();
