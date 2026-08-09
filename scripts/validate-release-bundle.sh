@@ -54,7 +54,9 @@ case $host in
 	*-w64-mingw32)
 		test -s "$root/bin/vdpm.exe"
 		test -s "$root/usr/bin/pacman.exe"
+		test -s "$root/usr/bin/vdpm-channel.exe"
 		test -s "$root/usr/bin/msys-2.0.dll"
+		test -s "$root/share/vdpm/refresh-repositories.ps1"
 		;;
 	*)
 		for executable in vdpm pacman pacman-conf vdpm-channel; do

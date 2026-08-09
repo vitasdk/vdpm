@@ -72,20 +72,20 @@ the minimal runtime contract is described below.
 
 ## Windows MSYS runtime
 
-The selected version-one Windows design ships a pinned, patched `pacman.exe`
+The selected version-one Windows transaction design ships a pinned, patched `pacman.exe`
 with exactly one adjacent non-system runtime, `msys-2.0.dll`. It does not ship
 an MSYS2 shell, environment or tool collection. `vdpm.exe` starts pacman
 directly and always supplies the SDK-local configuration, root, database,
 cache and log paths.
 
-Run the two-file contract on native Windows with PowerShell 7:
+Run the Pacman transaction contract on native Windows with PowerShell 7:
 
 ```powershell
 ./tests/pacman/msys-runtime-smoke.ps1
 ```
 
 With no arguments, the test downloads hash-pinned official MSYS2 artifacts,
-extracts only those two files, removes Git for Windows and installed MSYS2
+extracts only those two Pacman runtime files, removes Git for Windows and installed MSYS2
 directories from `PATH`, and performs install, query and remove operations on
 a synthetic package.
 
@@ -153,5 +153,5 @@ The native MinGW binary has not passed a Windows transaction test. Wine 10.20
 in the diagnostic container failed to finish its own prefix initialization,
 so it did not provide a meaningful libalpm runtime result. This path is now a
 preserved fallback rather than the version-one client: the MSYS pacman
-two-file runtime has completed the native install/query/remove test without a
+two-file Pacman runtime has completed the native install/query/remove test without a
 private VitaSDK POSIX compatibility layer.

@@ -37,4 +37,22 @@ VDPM_VALIDATE_EXECUTABLES=1 \
 	"$repository_root/scripts/validate-release-bundle.sh" \
 	"$temporary_directory/output-one/vdpm-1.0.0-$host.tar.bz2" "$host"
 
+windows_root="$temporary_directory/windows-root"
+windows_output="$temporary_directory/windows-output"
+mkdir -p "$windows_root/bin" "$windows_root/usr/bin" \
+	"$windows_root/share/vdpm/licenses" "$windows_output"
+for relative_path in bin/vdpm.exe usr/bin/pacman.exe \
+		usr/bin/vdpm-channel.exe usr/bin/msys-2.0.dll; do
+	printf 'fixture %s\n' "$relative_path" > "$windows_root/$relative_path"
+done
+printf 'refresh fixture\n' > \
+	"$windows_root/share/vdpm/refresh-repositories.ps1"
+cp "$repository_root/THIRD_PARTY_NOTICES.md" "$windows_root/share/vdpm/"
+printf 'license\n' > "$windows_root/share/vdpm/licenses/vdpm-LGPL-2.1.txt"
+windows_host=x86_64-w64-mingw32
+"$repository_root/scripts/create-release-bundle.sh" \
+	"$windows_root" "$windows_output" "$windows_host" 1.0.0 "$revision"
+"$repository_root/scripts/validate-release-bundle.sh" \
+	"$windows_output/vdpm-1.0.0-$windows_host.tar.bz2" "$windows_host"
+
 printf 'vdpm reproducible release bundle contract passed\n'

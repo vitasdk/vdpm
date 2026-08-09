@@ -62,11 +62,28 @@ verify_hash() {
 
 	[[ $("$channel_tool" sha256 "$file") == "$expected" ]]
 }
+download_database() {
+	local url=$1 name=$2 destination=$3
+
+	if [[ -n ${VITASDK_CHANNEL_ASSET_DIRECTORY:-} ]]; then
+		[[ -f $VITASDK_CHANNEL_ASSET_DIRECTORY/$name &&
+			! -L $VITASDK_CHANNEL_ASSET_DIRECTORY/$name ]] || {
+			printf 'channel database is not available: %s\n' \
+				"$VITASDK_CHANNEL_ASSET_DIRECTORY/$name" >&2
+			exit 1
+		}
+		cp "$VITASDK_CHANNEL_ASSET_DIRECTORY/$name" "$destination"
+	else
+		download "$url" "$destination"
+	fi
+}
 
 core_database="$temporary_directory/$host.db"
 vita_database="$temporary_directory/vita.db"
-download "$(value core.database.url)" "$core_database"
-download "$(value packages.database.url)" "$vita_database"
+download_database "$(value core.database.url)" \
+	"$(value core.database.name)" "$core_database"
+download_database "$(value packages.database.url)" \
+	"$(value packages.database.name)" "$vita_database"
 verify_hash "$(value core.database.sha256)" "$core_database"
 verify_hash "$(value packages.database.sha256)" "$vita_database"
 

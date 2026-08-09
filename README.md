@@ -6,8 +6,9 @@ package database and `/usr` are never used.
 
 The transaction frontend is implemented in portable C. On Windows it builds
 as a native `vdpm.exe` and starts the MSYS-ABI Pacman executable directly; it
-does not require Bash or link to libalpm. The Windows package-client runtime is
-limited to `$VITASDK/usr/bin/pacman.exe` and adjacent `msys-2.0.dll`.
+does not require Bash or link to libalpm. The Windows product ships Pacman and
+the signed-channel helper beside one `msys-2.0.dll`; channel orchestration uses
+Windows PowerShell 5.1, which is part of supported Windows installations.
 
 ```sh
 vdpm install zlib sdl2
@@ -24,13 +25,11 @@ vdpm pacman -- --database --check
 The historical forms `vdpm PACKAGE...`, `vdpm -f PACKAGE...` and
 `vdpm -u PACKAGE...` remain available during migration.
 
-The native Windows contract is exercised by
-`tests/test-vdpm-windows.ps1`. With non-system directories removed from
-`PATH`, it builds `vdpm.exe` with MSVC and uses the historical install and
-remove forms to complete a real Pacman install/query/remove transaction. The
-signed `vdpm refresh` orchestration is still implemented by the Unix shell
-frontend and remains to be ported before the native Windows frontend replaces
-it completely.
+The native Windows contracts are exercised by `tests/test-vdpm-windows.ps1`
+and `tests/test-channel-refresh-windows.ps1`. With non-system directories
+removed from `PATH`, they complete a real Pacman install/query/remove
+transaction and a signed, hash-verified channel refresh, including the failure
+path where a bad database must not replace installed repository state.
 
 ## Package client build
 
@@ -45,10 +44,11 @@ cmake --build build --target vdpm-package-client --parallel
 cmake --build build --target install
 ```
 
-On Windows, `tests/pacman/msys-pacman-build.sh` builds the pinned Pacman under
-MSYS and `tests/pacman/msys-runtime-smoke.ps1` verifies the two-file runtime.
-VitaSDK `buildscripts` only selects a vdpm revision, invokes this interface and
-incorporates the resulting files into the SDK distribution.
+On Windows, `tests/pacman/msys-pacman-build.sh` builds the pinned Pacman and
+channel helper under MSYS; `tests/pacman/msys-runtime-smoke.ps1` verifies the
+Pacman transaction runtime. VitaSDK `buildscripts` does not rebuild this
+product: on every host it verifies and incorporates an exact published vdpm
+bundle.
 
 ## Repository trust
 
@@ -102,5 +102,5 @@ texts. Tags named `v*` are published first as a draft release; the workflow
 downloads and byte-compares all assets before making the release visible.
 
 These component releases contain the package manager, not the compiler SDK.
-`buildscripts` incorporates an exact vdpm revision and `autobuilds` publishes
-the final `vitasdk-bootstrap-<host>` archives consumed by the bootstrap tools.
+`buildscripts` incorporates an exact host bundle and `autobuilds` publishes the
+final `vitasdk-bootstrap-<host>` archives consumed by the bootstrap tools.

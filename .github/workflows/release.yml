@@ -147,6 +147,7 @@ jobs:
           pacman_stage=$(cygpath -u "$RUNNER_TEMP/vdpm-pacman")
           mkdir -p "$stage/usr/bin" "$stage/share/vdpm/licenses"
           cp "$pacman_stage/pacman.exe" "$stage/usr/bin/"
+          cp "$pacman_stage/vdpm-channel.exe" "$stage/usr/bin/"
           cp "$pacman_stage/msys-2.0.dll" "$stage/usr/bin/"
           cp -R "$pacman_stage/licenses/." "$stage/share/vdpm/licenses/"
           revision=$(git rev-parse HEAD)
@@ -182,6 +183,12 @@ jobs:
             -ArchivePath $archive `
             -Sha256 $digest `
             -InstallDirectory (Join-Path $env:RUNNER_TEMP 'installed-vitasdk')
+      - name: Exercise signed Windows channel refresh
+        shell: pwsh
+        run: |
+          ./tests/test-channel-refresh-windows.ps1 `
+            -ProductRoot (Join-Path $pwd 'stage') `
+            -OpenSslExecutable (Join-Path '${{ steps.msys2.outputs.msys2-location }}' 'usr/bin/openssl.exe')
       - uses: actions/upload-artifact@v4
         with:
           name: vdpm-x86_64-w64-mingw32

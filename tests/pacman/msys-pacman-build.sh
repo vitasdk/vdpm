@@ -67,6 +67,12 @@ meson compile -C "$build_directory"
 
 mkdir -p "$output_directory"
 cp "$build_directory/pacman.exe" "$output_directory/pacman.exe"
+channel_flags=$(pkg-config --cflags libcrypto)
+channel_libraries=$(pkg-config --static --libs libcrypto)
+# shellcheck disable=SC2086
+gcc -std=c99 -O2 -Wall -Wextra -Werror -static-libgcc \
+	-o "$output_directory/vdpm-channel.exe" \
+	"$repository_root/src/vdpm-channel.c" $channel_flags $channel_libraries
 cp /usr/bin/msys-2.0.dll "$output_directory/msys-2.0.dll"
 mkdir -p "$output_directory/licenses"
 cp "$source_directory/COPYING" \
@@ -81,6 +87,23 @@ do
 		license_name=$(basename "$license_directory")
 		cp -R "$license_directory" "$output_directory/licenses/$license_name"
 	fi
+done
+
+mapfile -t channel_imports < <(
+	objdump -p "$output_directory/vdpm-channel.exe" |
+		sed -n 's/^[[:space:]]*DLL Name: //p' |
+		sort -fu
+)
+printf 'vdpm-channel.exe imports:\n'
+printf '  %s\n' "${channel_imports[@]}"
+for import in "${channel_imports[@]}"; do
+	case ${import,,} in
+		msys-2.0.dll) ;;
+		msys-*.dll)
+			printf 'unexpected MSYS runtime import: %s\n' "$import" >&2
+			exit 1
+			;;
+	esac
 done
 
 mapfile -t imports < <(
@@ -105,4 +128,4 @@ done
 	exit 1
 }
 
-printf 'built patched pacman 7.1.0 with the two-file MSYS runtime contract\n'
+printf 'built patched pacman 7.1.0 and the signed-channel helper with one MSYS runtime DLL\n'

@@ -38,7 +38,9 @@ source_date_epoch=${SOURCE_DATE_EPOCH:-}
 required=(share/vdpm/THIRD_PARTY_NOTICES.md share/vdpm/licenses/vdpm-LGPL-2.1.txt)
 case $host in
 	*-w64-mingw32)
-		required+=(bin/vdpm.exe usr/bin/pacman.exe usr/bin/msys-2.0.dll)
+		required+=(
+			bin/vdpm.exe usr/bin/pacman.exe usr/bin/vdpm-channel.exe
+			usr/bin/msys-2.0.dll share/vdpm/refresh-repositories.ps1)
 		;;
 	*)
 		required+=(

@@ -203,6 +203,58 @@ static int run_process(const char *path, char *const arguments[])
 #endif
 }
 
+#ifdef _WIN32
+static int run_windows_refresh(const char *root, const char *channel)
+{
+	const char *powershell_environment = getenv("VDPM_POWERSHELL");
+	const char *refresh_environment = getenv("VDPM_REFRESH_TOOL");
+	const char *system_root = getenv("SystemRoot");
+	char *powershell;
+	char *refresh;
+	char *arguments[10];
+	int status;
+
+	if (powershell_environment && powershell_environment[0])
+		powershell = duplicate_string(powershell_environment);
+	else {
+		if (!system_root || !system_root[0])
+			return fail("SystemRoot is not set");
+		powershell = join_path(system_root,
+			"System32/WindowsPowerShell/v1.0/powershell.exe");
+	}
+	if (refresh_environment && refresh_environment[0])
+		refresh = duplicate_string(refresh_environment);
+	else
+		refresh = join_path(root, "share/vdpm/refresh-repositories.ps1");
+	if (access(powershell, 0) != 0) {
+		status = fail_path("Windows PowerShell is not available", powershell);
+		free(refresh);
+		free(powershell);
+		return status;
+	}
+	if (access(refresh, 4) != 0) {
+		status = fail_path("channel refresh helper is not readable", refresh);
+		free(refresh);
+		free(powershell);
+		return status;
+	}
+	arguments[0] = powershell;
+	arguments[1] = "-NoLogo";
+	arguments[2] = "-NoProfile";
+	arguments[3] = "-NonInteractive";
+	arguments[4] = "-ExecutionPolicy";
+	arguments[5] = "Bypass";
+	arguments[6] = "-File";
+	arguments[7] = refresh;
+	arguments[8] = (char *)channel;
+	arguments[9] = NULL;
+	status = run_process(powershell, arguments);
+	free(refresh);
+	free(powershell);
+	return status;
+}
+#endif
+
 static int command_from_name(const char *name, enum command *command)
 {
 	if (strcmp(name, "install") == 0)
@@ -288,8 +340,10 @@ int main(int argc, char **argv)
 			return fail("refresh accepts at most one channel");
 		}
 #ifdef _WIN32
+		status = run_windows_refresh(root,
+			input < argc ? argv[input] : "stable");
 		free(root);
-		return fail("native channel refresh is not implemented yet");
+		return status;
 #else
 		{
 			char *refresh = join_path(root,

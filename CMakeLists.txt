@@ -21,6 +21,7 @@ install(FILES LICENSE
 install(FILES THIRD_PARTY_NOTICES.md DESTINATION share/vdpm)
 install(PROGRAMS bootstrap-vitasdk.sh DESTINATION share/vdpm)
 install(FILES bootstrap-vitasdk.ps1 DESTINATION share/vdpm)
+install(FILES include/refresh-repositories.ps1 DESTINATION share/vdpm)
 if(UNIX)
     install(DIRECTORY include/
         DESTINATION bin/include
