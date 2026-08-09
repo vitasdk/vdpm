@@ -154,7 +154,7 @@ jobs:
           scripts/create-release-bundle.sh \
             "$stage" "$PWD/release" x86_64-w64-mingw32 \
             '${{ needs.prepare.outputs.version }}' "$revision"
-          scripts/validate-release-bundle.sh \
+          VDPM_VALIDATE_PE_IMPORTS=1 scripts/validate-release-bundle.sh \
             release/*.tar.bz2 x86_64-w64-mingw32
       - name: Exercise exact Windows bundle inputs
         shell: pwsh
@@ -219,7 +219,12 @@ jobs:
           for host in "${expected[@]}"; do
             archive="release/vdpm-${{ needs.prepare.outputs.version }}-$host.tar.bz2"
             test -f "$archive"
-            scripts/validate-release-bundle.sh "$archive" "$host"
+            if [[ $host == *-w64-mingw32 ]]; then
+              VDPM_VALIDATE_PE_IMPORTS=1 \
+                scripts/validate-release-bundle.sh "$archive" "$host"
+            else
+              scripts/validate-release-bundle.sh "$archive" "$host"
+            fi
             (cd release && sha256sum -c "$(basename "$archive").sha256")
           done
           (

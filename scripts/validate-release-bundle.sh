@@ -57,6 +57,29 @@ case $host in
 		test -s "$root/usr/bin/vdpm-channel.exe"
 		test -s "$root/usr/bin/msys-2.0.dll"
 		test -s "$root/share/vdpm/refresh-repositories.ps1"
+		if [[ ${VDPM_VALIDATE_PE_IMPORTS:-0} == 1 ]]; then
+			command -v objdump >/dev/null
+			mapfile -t vdpm_imports < <(
+				objdump -p "$root/bin/vdpm.exe" |
+					sed -n 's/^[[:space:]]*DLL Name: //p' |
+					sort -fu
+			)
+			(( ${#vdpm_imports[@]} > 0 ))
+			for import in "${vdpm_imports[@]}"; do
+				case ${import,,} in
+					vcruntime*.dll|msvcp*.dll|ucrtbase.dll|api-ms-win-crt-*.dll)
+						printf 'vdpm.exe imports a dynamic C runtime: %s\n' \
+							"$import" >&2
+						exit 1
+						;;
+					msys-*.dll)
+						printf 'vdpm.exe unexpectedly imports MSYS: %s\n' \
+							"$import" >&2
+						exit 1
+						;;
+				esac
+			done
+		fi
 		;;
 	*)
 		for executable in vdpm pacman pacman-conf vdpm-channel; do
