@@ -40,7 +40,7 @@ run_vdpm pacman -- --database --check
 
 common="--config $sdk_root/etc/pacman.conf --root $sdk_root --dbpath $sdk_root/var/lib/pacman --cachedir $sdk_root/var/cache/pacman/pkg --logfile $sdk_root/var/log/pacman.log"
 transaction_common="$common --noscriptlet --noconfirm --noprogressbar"
-query_common="$common --noconfirm --noprogressbar"
+query_common="$common"
 grep -Fqx -e "$transaction_common --sync zlib libpng " "$arguments_log"
 grep -Fqx -e "$transaction_common --remove zlib " "$arguments_log"
 grep -Fqx -e "$transaction_common --sync --sysupgrade " "$arguments_log"
