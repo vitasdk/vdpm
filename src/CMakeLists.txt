@@ -26,6 +26,7 @@ endif()
 
 if(MSVC)
     if(BUILD_VDPM_FRONTEND)
+        target_compile_definitions(vdpm PRIVATE _CRT_SECURE_NO_WARNINGS)
         target_compile_options(vdpm PRIVATE /W4 /WX)
     endif()
 else()
