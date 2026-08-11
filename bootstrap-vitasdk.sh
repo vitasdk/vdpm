@@ -143,6 +143,17 @@ if [[ -z $local_archive && ( -z $url || -z $expected_sha256 ) ]]; then
 			expected_sha256=$(printf '%s' "$sidecar_content" | awk '{print $1}')
 		fi
 	fi
+
+	# Grouped releases carry a single SHA256SUMS covering every asset, so the
+	# digest stays available when an archive ships without its own sidecar.
+	if [[ -z $expected_sha256 ]]; then
+		sums_content=$(download_to_string "${url%/*}/SHA256SUMS" || true)
+		if [[ -n $sums_content ]]; then
+			expected_sha256=$(printf '%s' "$sums_content" |
+				awk -v archive="${url##*/}" \
+					'{ sub(/^\*/, "", $2) } $2 == archive { print $1; exit }')
+		fi
+	fi
 fi
 
 expected_sha256=$(printf '%s' "$expected_sha256" | tr 'A-F' 'a-f')
