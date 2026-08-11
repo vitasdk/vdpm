@@ -47,6 +47,38 @@ while (( $# > 0 )); do
 	esac
 done
 
+detect_host_triplet() {
+	local architecture
+	architecture=$(uname -m)
+	case $architecture in
+		amd64) architecture=x86_64 ;;
+		arm64|aarch64)
+			if [[ $(uname -s) == Linux ]]; then
+				architecture=aarch64
+			else
+				architecture=arm64
+			fi
+			;;
+	esac
+	case $(uname -s) in
+		Darwin*) printf '%s-apple-darwin\n' "$architecture" ;;
+		Linux*) printf '%s-linux-gnu\n' "$architecture" ;;
+		MSYS*|MINGW*|CYGWIN*) printf '%s-w64-mingw32\n' "$architecture" ;;
+		*) return 1 ;;
+	esac
+}
+
+download_to_string() {
+	local target_url=$1
+	if command -v curl >/dev/null; then
+		curl --fail --location --silent --show-error "$target_url" 2>/dev/null || return 1
+	elif command -v wget >/dev/null; then
+		wget -q -O - "$target_url" 2>/dev/null || return 1
+	else
+		return 1
+	fi
+}
+
 [[ $install_directory == /* && $install_directory != / ]] || {
 	printf 'VitaSDK install directory must be an absolute, non-root path\n' >&2
 	exit 1
@@ -55,6 +87,64 @@ done
 	printf 'VitaSDK install directory already exists: %s\n' "$install_directory" >&2
 	exit 1
 }
+
+# If local archive is provided and has an adjacent .sha256 file, read it if not explicitly set
+if [[ -n $local_archive && -z $expected_sha256 && -f "${local_archive}.sha256" ]]; then
+	expected_sha256=$(awk '{print $1}' "${local_archive}.sha256")
+fi
+
+# Auto-resolve URL and SHA256 if neither local archive nor explicit parameters were passed
+if [[ -z $local_archive && ( -z $url || -z $expected_sha256 ) ]]; then
+	host=$(detect_host_triplet) || {
+		printf 'Unsupported host platform for automatic VitaSDK bootstrap\n' >&2
+		exit 1
+	}
+	printf 'Detecting VitaSDK bootstrap archive for %s...\n' "$host" >&2
+
+	channel=${VITASDK_CHANNEL:-stable}
+	manifest_base=${VITASDK_CHANNEL_BASE_URL:-https://vitasdk.github.io/channels}
+	manifest_url="$manifest_base/$channel.json"
+	manifest_content=$(download_to_string "$manifest_url" || true)
+
+	if [[ -z $manifest_content && $channel == stable ]]; then
+		manifest_url="$manifest_base/nightly.json"
+		manifest_content=$(download_to_string "$manifest_url" || true)
+	fi
+
+	if [[ -n $manifest_content ]]; then
+		release_tag=$(printf '%s' "$manifest_content" | grep -o '"release":"[^"]*"' | head -n1 | cut -d'"' -f4)
+		if [[ -n $release_tag ]]; then
+			resolved_url="https://github.com/vitasdk/autobuilds/releases/download/$release_tag/vitasdk-bootstrap-$host.tar.bz2"
+			if [[ -z $url ]]; then
+				url=$resolved_url
+			fi
+		fi
+	fi
+
+	if [[ -z $url ]]; then
+		releases_json=$(download_to_string "https://api.github.com/repos/vitasdk/autobuilds/releases" || true)
+		if [[ -n $releases_json ]]; then
+			resolved_url=$(printf '%s' "$releases_json" | grep -o '"browser_download_url": *"[^"]*"' | grep "vitasdk-bootstrap-$host.tar.bz2" | head -n1 | sed 's/.*"\(https:[^"]*\)".*/\1/')
+			if [[ -n $resolved_url ]]; then
+				url=$resolved_url
+			fi
+		fi
+	fi
+
+	[[ -n $url ]] || {
+		printf 'Could not automatically resolve VitaSDK bootstrap archive for %s\n' "$host" >&2
+		printf 'Please specify --url URL and --sha256 HEX manually\n' >&2
+		exit 1
+	}
+
+	if [[ -z $expected_sha256 ]]; then
+		sidecar_content=$(download_to_string "${url}.sha256" || true)
+		if [[ -n $sidecar_content ]]; then
+			expected_sha256=$(printf '%s' "$sidecar_content" | awk '{print $1}')
+		fi
+	fi
+fi
+
 expected_sha256=$(printf '%s' "$expected_sha256" | tr 'A-F' 'a-f')
 [[ $expected_sha256 =~ ^[0-9a-f]{64}$ ]] || {
 	printf 'VITASDK_BOOTSTRAP_SHA256 must contain the immutable archive hash\n' >&2

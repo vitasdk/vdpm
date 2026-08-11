@@ -2,7 +2,8 @@ param(
     [string]$InstallDirectory = $(if ($env:VITASDK) { $env:VITASDK } else { "C:\vitasdk" }),
     [string]$Url = $env:VITASDK_BOOTSTRAP_URL,
     [string]$Sha256 = $env:VITASDK_BOOTSTRAP_SHA256,
-    [string]$ArchivePath = $env:VITASDK_BOOTSTRAP_ARCHIVE
+    [string]$ArchivePath = $env:VITASDK_BOOTSTRAP_ARCHIVE,
+    [string]$Channel = $(if ($env:VITASDK_CHANNEL) { $env:VITASDK_CHANNEL } else { "stable" })
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,7 +15,73 @@ if (-not [IO.Path]::IsPathFullyQualified($InstallDirectory)) {
 if (Test-Path $InstallDirectory) {
     throw "VitaSDK install directory already exists: ${InstallDirectory}"
 }
-$Sha256 = $Sha256.ToLowerInvariant()
+
+if ($ArchivePath -and -not $Sha256 -and (Test-Path "${ArchivePath}.sha256")) {
+    $Sha256 = (Get-Content "${ArchivePath}.sha256" -Raw).Trim().Split()[0]
+}
+
+if (-not $ArchivePath -and (-not $Url -or -not $Sha256)) {
+    $hostArchitecture = "x86_64-w64-mingw32"
+    Write-Host "Detecting VitaSDK bootstrap archive for $hostArchitecture..."
+    
+    $manifestBase = if ($env:VITASDK_CHANNEL_BASE_URL) { $env:VITASDK_CHANNEL_BASE_URL } else { "https://vitasdk.github.io/channels" }
+    $manifestUrl = "$manifestBase/$Channel.json"
+    $manifestJson = $null
+    try {
+        $manifestJson = (Invoke-RestMethod -Uri $manifestUrl -Method Get -TimeoutSec 10)
+    }
+    catch {
+        if ($Channel -eq "stable") {
+            try {
+                $manifestJson = (Invoke-RestMethod -Uri "$manifestBase/nightly.json" -Method Get -TimeoutSec 10)
+            }
+            catch {}
+        }
+    }
+    
+    if ($manifestJson -and $manifestJson.core -and $manifestJson.core.release) {
+        $releaseTag = $manifestJson.core.release
+        if (-not $Url) {
+            $Url = "https://github.com/vitasdk/autobuilds/releases/download/$releaseTag/vitasdk-bootstrap-$hostArchitecture.tar.bz2"
+        }
+    }
+    
+    if (-not $Url) {
+        try {
+            $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/vitasdk/autobuilds/releases" -Method Get -TimeoutSec 10
+            foreach ($rel in $releases) {
+                foreach ($asset in $rel.assets) {
+                    if ($asset.name -eq "vitasdk-bootstrap-$hostArchitecture.tar.bz2") {
+                        $Url = $asset.browser_download_url
+                        break
+                    }
+                }
+                if ($Url) { break }
+            }
+        }
+        catch {}
+    }
+    
+    if (-not $Url) {
+        throw "Could not automatically resolve VitaSDK bootstrap archive for $hostArchitecture. Please supply -Url and -Sha256."
+    }
+    
+    if (-not $Sha256) {
+        try {
+            $sidecarContent = (Invoke-RestMethod -Uri "${Url}.sha256" -Method Get -TimeoutSec 10)
+            if ($sidecarContent) {
+                $Sha256 = ($sidecarContent -split '\s+')[0].Trim()
+            }
+        }
+        catch {
+            throw "Could not retrieve checksum from ${Url}.sha256. Please supply -Sha256 explicitly."
+        }
+    }
+}
+
+if ($Sha256) {
+    $Sha256 = $Sha256.ToLowerInvariant()
+}
 if ($Sha256 -notmatch '^[0-9a-f]{64}$') {
     throw "VITASDK_BOOTSTRAP_SHA256 must contain the immutable archive hash"
 }

@@ -56,6 +56,12 @@ if VITASDK_BOOTSTRAP_ARCHIVE="$archive" \
 	printf 'bootstrap replaced an existing SDK\n' >&2
 	exit 1
 fi
-test -f "$install_directory/version_info.txt"
+# Test auto-reading digest from adjacent .sha256 file
+printf '%s  %s\n' "$digest" "$(basename "$archive")" > "${archive}.sha256"
+sidecar_install="$temporary_directory/sidecar installed"
+VITASDK_BOOTSTRAP_ARCHIVE="$archive" \
+	"$repository_root/bootstrap-vitasdk.sh" --install-dir "$sidecar_install"
+test -x "$sidecar_install/bin/vdpm"
+test -f "$sidecar_install/version_info.txt"
 
 printf 'VitaSDK atomic bootstrap contract passed\n'
