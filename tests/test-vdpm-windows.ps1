@@ -161,6 +161,22 @@ try {
     if (Test-Path $installedFile) {
         throw "vdpm left the package payload after removal"
     }
+
+    # Reading which release this is has to work where there is no shell to
+    # lean on, which is the whole reason it is not a script.
+    $manifest = Join-Path $env:VITASDK "var/lib/vdpm/channel.json"
+    New-Item -ItemType Directory -Path (Split-Path $manifest) -Force | Out-Null
+    Set-Content -LiteralPath $manifest -NoNewline -Value (
+        '{"channel":"2026.09","core":{"release":"core-1","repository":"vitasdk/autobuilds"},' +
+        '"packages":{"release":"packages-1","repository":"vitasdk/vitasdk-autobuild"},' +
+        '"schema_version":1,"sequence":7}' + "`n")
+    $reported = @(& $vdpm status)
+    if ($LASTEXITCODE -ne 0) {
+        throw "vdpm status failed on Windows"
+    }
+    if (-not ($reported -join "`n").Contains("2026.09")) {
+        throw "vdpm status did not name the release"
+    }
 }
 finally {
     $env:PATH = $savedPath

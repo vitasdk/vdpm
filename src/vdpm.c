@@ -41,6 +41,9 @@ enum command {
 
 static const char *program_name = "vdpm";
 
+/* The package that carries the toolchain, and with it this program. */
+#define CORE_PACKAGE "vitasdk-core"
+
 static void usage(FILE *stream)
 {
 	fputs(
@@ -282,7 +285,8 @@ static int run_process(const char *path, char *const arguments[])
 }
 
 #ifdef _WIN32
-static int run_windows_refresh(const char *root, const char *channel)
+static int run_windows_script(const char *root, const char *relative,
+			      const char *argument)
 {
 	const char *powershell_environment = getenv("VDPM_POWERSHELL");
 	const char *refresh_environment = getenv("VDPM_REFRESH_TOOL");
@@ -303,7 +307,7 @@ static int run_windows_refresh(const char *root, const char *channel)
 	if (refresh_environment && refresh_environment[0])
 		refresh = duplicate_string(refresh_environment);
 	else
-		refresh = join_path(root, "share/vdpm/refresh-repositories.ps1");
+		refresh = join_path(root, relative);
 	if (access(powershell, 0) != 0) {
 		status = fail_path("Windows PowerShell is not available", powershell);
 		free(refresh);
@@ -311,7 +315,7 @@ static int run_windows_refresh(const char *root, const char *channel)
 		return status;
 	}
 	if (access(refresh, 4) != 0) {
-		status = fail_path("channel refresh helper is not readable", refresh);
+		status = fail_path("channel helper is not readable", refresh);
 		free(refresh);
 		free(powershell);
 		return status;
@@ -324,8 +328,10 @@ static int run_windows_refresh(const char *root, const char *channel)
 	arguments[5] = "Bypass";
 	arguments[6] = "-File";
 	arguments[7] = refresh;
-	arguments[8] = (char *)channel;
+	arguments[8] = (char *)argument;
 	arguments[9] = NULL;
+	if (!argument)
+		arguments[8] = NULL;
 	status = run_process(powershell, arguments);
 	free(refresh);
 	free(powershell);
@@ -433,6 +439,132 @@ out:
  * the install still happens, because everything already depending on it keeps
  * working and taking that decision away helps nobody.
  */
+#ifdef _WIN32
+/*
+ * Refuses an upgrade that would replace the running client, and says how.
+ *
+ * Windows will not let a running executable be overwritten, and the core
+ * package carries both vdpm.exe and pacman.exe — the two programs doing the
+ * upgrading. rustup solves the same problem by renaming itself aside, but
+ * that only covers the caller: pacman would still be replacing itself
+ * mid-transaction. MSYS2 takes the other route and tells you to close
+ * everything and run it again, which is what this does, minus the surprise
+ * of finding out through a permission error.
+ */
+static int refuse_self_replacement(const char *pacman, char **base, int base_count)
+{
+	char command[4096];
+	char line[512];
+	FILE *pipe;
+	int offset = 0;
+	int index;
+	int found = 0;
+
+	for (index = 0; index < base_count && base[index]; index++)
+		offset += snprintf(command + offset, sizeof(command) - offset,
+				   "\"%s\" ", base[index]);
+	snprintf(command + offset, sizeof(command) - offset, "--query --upgrades");
+
+	pipe = popen(command, "r");
+	if (!pipe)
+		return 0;
+	while (fgets(line, sizeof(line), pipe))
+		if (strncmp(line, CORE_PACKAGE, strlen(CORE_PACKAGE)) == 0)
+			found = 1;
+	pclose(pipe);
+
+	if (!found)
+		return 0;
+	fprintf(stderr,
+		"%s: this update replaces the toolchain, which includes vdpm and\n"
+		"pacman themselves. Windows cannot overwrite a program while it is\n"
+		"running, so run the bootstrap script again instead:\n"
+		"\n"
+		"  .\\bootstrap-vitasdk.ps1\n"
+		"\n"
+		"Packages you installed are recorded and reinstalled by it.\n",
+		program_name);
+	return 1;
+}
+#endif
+
+static int print_status(const char *root)
+{
+	/* Native rather than a shell script: this has to answer "which VitaSDK
+	 * is this?" on every platform, and Windows has no shell to lean on. */
+	char *tool = join_path(root, "bin/vdpm-channel");
+	char *manifest = join_path(root, "var/lib/vdpm/channel.json");
+	char *index = join_path(root, "var/lib/vdpm/index.json");
+	char command[2048];
+	char line[1024];
+	char channel[128] = "";
+	FILE *pipe;
+	int status = 1;
+
+	if (!tool || !manifest || !index)
+		goto out;
+	if (access(manifest, 0) != 0) {
+		fprintf(stderr, "%s: no channel configured; run `vdpm refresh` first\n",
+			program_name);
+		goto out;
+	}
+
+	snprintf(command, sizeof(command), "\"%s\" describe \"%s\"", tool, manifest);
+	pipe = popen(command, "r");
+	if (!pipe)
+		goto out;
+	while (fgets(line, sizeof(line), pipe)) {
+		char *tab = strchr(line, '\t');
+		char *newline;
+
+		if (!tab)
+			continue;
+		*tab = '\0';
+		newline = strchr(tab + 1, '\n');
+		if (newline)
+			*newline = '\0';
+		if (strcmp(line, "channel") == 0) {
+			snprintf(channel, sizeof(channel), "%s", tab + 1);
+			printf("Release   %s\n", tab + 1);
+		} else if (strcmp(line, "sequence") == 0)
+			printf("Sequence  %s\n", tab + 1);
+		else if (strcmp(line, "core") == 0)
+			printf("Toolchain %s\n", tab + 1);
+		else if (strcmp(line, "packages") == 0)
+			printf("Packages  %s\n", tab + 1);
+	}
+	pclose(pipe);
+	status = channel[0] ? 0 : 1;
+
+	if (status == 0 && access(index, 0) == 0) {
+		snprintf(command, sizeof(command), "\"%s\" series \"%s\"", tool, index);
+		pipe = popen(command, "r");
+		if (pipe) {
+			while (fgets(line, sizeof(line), pipe)) {
+				char *first = strchr(line, '\t');
+				char *second;
+
+				if (!first)
+					continue;
+				*first = '\0';
+				if (strcmp(line, channel) != 0)
+					continue;
+				second = strchr(first + 1, '\t');
+				if (second)
+					*second = '\0';
+				printf("Status    %s\n", first + 1);
+			}
+			pclose(pipe);
+		}
+	}
+
+out:
+	free(tool);
+	free(manifest);
+	free(index);
+	return status;
+}
+
 static void warn_about_deprecated(const char *root, char **argv, int first, int argc)
 {
 	char *tool = join_path(root, "bin/vdpm-channel");
@@ -558,20 +690,32 @@ int main(int argc, char **argv)
 	root = normalized_root(root_environment);
 	if (!root)
 		return fail("VITASDK must be an absolute, non-root path");
-	if (command == COMMAND_CHANNELS || command == COMMAND_STATUS) {
-		const char *relative = command == COMMAND_CHANNELS ?
-			"bin/include/list-channels.sh" : "bin/include/show-status.sh";
-		char *script = join_path(root, relative);
-		char *script_arguments[2];
+	if (command == COMMAND_STATUS) {
+		status = print_status(root);
+		free(root);
+		return status;
+	}
+	if (command == COMMAND_CHANNELS) {
+		/* This one has to reach the network, which is exactly why refresh
+		 * has two implementations. Same split here rather than a shell
+		 * script Windows cannot run. */
+#ifdef _WIN32
+		status = run_windows_script(root, "share/vdpm/list-channels.ps1", NULL);
+#else
+		{
+			char *script = join_path(root, "bin/include/list-channels.sh");
+			char *script_arguments[2];
 
-		if (!script) {
-			free(root);
-			return fail("out of memory");
+			if (!script) {
+				free(root);
+				return fail("out of memory");
+			}
+			script_arguments[0] = script;
+			script_arguments[1] = NULL;
+			status = run_process(script, script_arguments);
+			free(script);
 		}
-		script_arguments[0] = script;
-		script_arguments[1] = NULL;
-		status = run_process(script, script_arguments);
-		free(script);
+#endif
 		free(root);
 		return status;
 	}
@@ -581,7 +725,7 @@ int main(int argc, char **argv)
 			return fail("refresh accepts at most one channel");
 		}
 #ifdef _WIN32
-		status = run_windows_refresh(root,
+		status = run_windows_script(root, "share/vdpm/refresh-repositories.ps1",
 			input < argc ? argv[input] : "stable");
 		free(root);
 		return status;
@@ -727,6 +871,22 @@ int main(int argc, char **argv)
 		if (command == COMMAND_INSTALL)
 			warn_about_deprecated(root, argv, operands, argc);
 	}
+#ifdef _WIN32
+	/* Before the transaction rather than after: finding this out through a
+	 * permission error leaves a half-applied upgrade behind. */
+	if (command == COMMAND_UPGRADE &&
+	    refuse_self_replacement(pacman, arguments, argument_count)) {
+		free(arguments);
+		free(log);
+		free(log_directory);
+		free(cache);
+		free(database);
+		free(configuration);
+		free(pacman);
+		free(root);
+		return 1;
+	}
+#endif
 	status = run_process(pacman, arguments);
 	free(arguments);
 	free(log);

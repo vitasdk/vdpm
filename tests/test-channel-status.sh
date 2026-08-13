@@ -18,7 +18,7 @@ trap 'rm -rf "$root"' EXIT
 
 mkdir -p "$root/bin/include" "$root/var/lib/vdpm" "$root/etc"
 cp "$build/vdpm-channel" "$root/bin/"
-cp "$directory/include/show-status.sh" "$directory/include/list-channels.sh" "$root/bin/include/"
+cp "$directory/include/list-channels.sh" "$root/bin/include/"
 chmod +x "$root/bin/include/"*.sh
 printf '[options]\n' > "$root/etc/pacman.conf"
 printf '#!/bin/sh\nexit 0\n' > "$root/bin/pacman"
