@@ -87,6 +87,15 @@ case $host in
 		done
 		test -x "$root/bin/include/host-triplet.sh"
 		test -x "$root/bin/include/refresh-repositories.sh"
+		# vdpm runs every helper as a program, so one shipped without its
+		# executable bit is a command that fails on an installed SDK.
+		while IFS= read -r helper; do
+			[[ -x $helper ]] || {
+				printf 'bundle helper is not executable: %s\n' \
+					"${helper#"$root/"}" >&2
+				exit 1
+			}
+		done < <(find "$root/bin/include" -type f -name '*.sh')
 		for license in pacman-GPL-2.0.txt zlib.txt xz-COPYING.txt \
 				libarchive.txt openssl-Apache-2.0.txt curl.txt; do
 			test -s "$root/share/vdpm/licenses/$license"
