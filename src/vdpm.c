@@ -18,6 +18,8 @@
 #include <process.h>
 #define access _access
 #define mkdir_one(path) _mkdir(path)
+#define popen _popen
+#define pclose _pclose
 #else
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -451,7 +453,7 @@ out:
  * everything and run it again, which is what this does, minus the surprise
  * of finding out through a permission error.
  */
-static int refuse_self_replacement(const char *pacman, char **base, int base_count)
+static int refuse_self_replacement(char **base, int base_count)
 {
 	char command[4096];
 	char line[512];
@@ -875,7 +877,7 @@ int main(int argc, char **argv)
 	/* Before the transaction rather than after: finding this out through a
 	 * permission error leaves a half-applied upgrade behind. */
 	if (command == COMMAND_UPGRADE &&
-	    refuse_self_replacement(pacman, arguments, argument_count)) {
+	    refuse_self_replacement(arguments, argument_count)) {
 		free(arguments);
 		free(log);
 		free(log_directory);
