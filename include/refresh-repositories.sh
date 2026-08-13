@@ -35,7 +35,13 @@ channel_tool=${VDPM_CHANNEL_TOOL:-$script_directory/../vdpm-channel}
 	exit 1
 }
 [[ ! -e $VITASDK/var/lib/pacman/db.lck ]] || {
-	printf 'pacman database is locked; repository refresh refused\n' >&2
+	# Refusing is right: the configuration must not be rewritten under a
+	# transaction. Saying only that leaves somebody who pressed Ctrl-C with
+	# no way out, so say what the lock is and how to clear it.
+	printf 'the package database is locked, so the repositories were not touched\n' >&2
+	printf 'another vdpm or pacman may be running; if none is, an interrupted one\n' >&2
+	printf 'left the lock behind and it is safe to remove:\n' >&2
+	printf '  rm %s/var/lib/pacman/db.lck\n' "$VITASDK" >&2
 	exit 1
 }
 
