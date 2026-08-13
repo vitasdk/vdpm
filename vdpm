@@ -14,7 +14,7 @@ Usage:
   vdpm search TERM...
   vdpm info PACKAGE...
   vdpm files PACKAGE...
-  vdpm refresh [stable|nightly]
+  vdpm refresh SERIES
 
 Compatibility:
   vdpm PACKAGE...       Same as `vdpm install PACKAGE...`
@@ -127,7 +127,10 @@ case $command in
 		run_pacman --query --list "$@"
 		;;
 	refresh)
-		(( $# <= 1 )) || die 'refresh accepts at most one channel'
-		"$script_directory/include/refresh-repositories.sh" "${1:-stable}"
+		(( $# <= 1 )) || die 'refresh accepts at most one series'
+		# No default. Refresh is the command that moves somebody between
+		# series, and the name it used to assume -- stable -- is not a series.
+		(( $# == 1 )) || die 'refresh requires a series; run `vdpm channels` to see them'
+		"$script_directory/include/refresh-repositories.sh" "$1"
 		;;
 esac

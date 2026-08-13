@@ -3,7 +3,7 @@ param(
     [string]$Url = $env:VITASDK_BOOTSTRAP_URL,
     [string]$Sha256 = $env:VITASDK_BOOTSTRAP_SHA256,
     [string]$ArchivePath = $env:VITASDK_BOOTSTRAP_ARCHIVE,
-    [string]$Channel = $(if ($env:VITASDK_CHANNEL) { $env:VITASDK_CHANNEL } else { "stable" })
+    [string]$Channel = $env:VITASDK_CHANNEL
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,47 +25,46 @@ if (-not $ArchivePath -and (-not $Url -or -not $Sha256)) {
     Write-Host "Detecting VitaSDK bootstrap archive for $hostArchitecture..."
     
     $manifestBase = if ($env:VITASDK_CHANNEL_BASE_URL) { $env:VITASDK_CHANNEL_BASE_URL } else { "https://vitasdk.github.io/channels" }
-    $manifestUrl = "$manifestBase/$Channel.json"
-    $manifestJson = $null
+
+    # Nothing requested, or the `stable` alias: the index says which series is
+    # supported today. `stable` is not a channel and never was one -- there is
+    # no stable.json to fetch -- so it is resolved here and never stored, the
+    # way `latest` names a Docker image without being one.
+    if (-not $Channel -or $Channel -eq "stable") {
+        try {
+            $index = Invoke-RestMethod -Uri "$manifestBase/index.json" -Method Get -TimeoutSec 10
+        }
+        catch {
+            throw "Could not read the release index at $manifestBase/index.json"
+        }
+        # Series are named YYYY.MM, so the newest one is the highest year and
+        # then the highest month.
+        $Channel = $index.channels.PSObject.Properties |
+            Where-Object { $_.Value.status -eq "supported" } |
+            Sort-Object { [int]($_.Name -split '\.')[0] }, { [int]($_.Name -split '\.')[1] } -Descending |
+            Select-Object -First 1 -ExpandProperty Name
+        if (-not $Channel) {
+            throw "The release index at $manifestBase lists no supported series"
+        }
+        Write-Host "Installing the supported series $Channel"
+    }
+
+    # No fallback to anything else. Installing a series nobody asked for -- as
+    # resolving `stable` to the nightly used to do -- hands somebody the
+    # development channel while they believe they asked for the stable one.
     try {
-        $manifestJson = (Invoke-RestMethod -Uri $manifestUrl -Method Get -TimeoutSec 10)
+        $manifestJson = Invoke-RestMethod -Uri "$manifestBase/$Channel.json" -Method Get -TimeoutSec 10
     }
     catch {
-        if ($Channel -eq "stable") {
-            try {
-                $manifestJson = (Invoke-RestMethod -Uri "$manifestBase/nightly.json" -Method Get -TimeoutSec 10)
-            }
-            catch {}
-        }
+        throw "Could not read the $Channel manifest at $manifestBase/$Channel.json"
     }
-    
-    if ($manifestJson -and $manifestJson.core -and $manifestJson.core.release) {
-        $releaseTag = $manifestJson.core.release
-        if (-not $Url) {
-            $Url = "https://github.com/vitasdk/autobuilds/releases/download/$releaseTag/vitasdk-bootstrap-$hostArchitecture.tar.bz2"
-        }
+    if (-not ($manifestJson.core -and $manifestJson.core.release)) {
+        throw "The $Channel manifest names no core release"
     }
-    
     if (-not $Url) {
-        try {
-            $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/vitasdk/autobuilds/releases" -Method Get -TimeoutSec 10
-            foreach ($rel in $releases) {
-                foreach ($asset in $rel.assets) {
-                    if ($asset.name -eq "vitasdk-bootstrap-$hostArchitecture.tar.bz2") {
-                        $Url = $asset.browser_download_url
-                        break
-                    }
-                }
-                if ($Url) { break }
-            }
-        }
-        catch {}
+        $Url = "https://github.com/vitasdk/autobuilds/releases/download/$($manifestJson.core.release)/vitasdk-bootstrap-$hostArchitecture.tar.bz2"
     }
-    
-    if (-not $Url) {
-        throw "Could not automatically resolve VitaSDK bootstrap archive for $hostArchitecture. Please supply -Url and -Sha256."
-    }
-    
+
     if (-not $Sha256) {
         try {
             $sidecarContent = (Invoke-RestMethod -Uri "${Url}.sha256" -Method Get -TimeoutSec 10)
@@ -169,6 +168,20 @@ try {
 
     Move-Item $stagingDirectory $InstallDirectory
     Write-Host "VitaSDK installed at ${InstallDirectory}"
+
+    # The series has to be written into the SDK, not merely used to pick an
+    # archive and then forgotten. Without this the new SDK has no repositories
+    # at all and its series is decided by whatever is typed next, so a core
+    # installed from one series can end up refreshed onto another with nothing
+    # objecting.
+    if ($Channel) {
+        $env:VITASDK = $InstallDirectory
+        & (Join-Path $InstallDirectory "bin/vdpm.exe") refresh $Channel
+        if ($LASTEXITCODE -ne 0) {
+            throw "The SDK is installed at ${InstallDirectory} but no series is selected. Run: vdpm refresh ${Channel}"
+        }
+    }
+
     Write-Host "Set VITASDK=${InstallDirectory} and prepend `%VITASDK`%\bin to PATH."
 }
 finally {

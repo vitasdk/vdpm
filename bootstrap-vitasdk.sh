@@ -10,6 +10,9 @@ Installs one immutable VitaSDK archive into a new directory. The equivalent
 VITASDK, VITASDK_BOOTSTRAP_URL and VITASDK_BOOTSTRAP_SHA256 environment
 variables may be used. VITASDK_BOOTSTRAP_ARCHIVE selects a local archive for
 offline installation and tests; its SHA-256 is still mandatory.
+
+VITASDK_CHANNEL names the release series to install. Without it, the newest
+supported series in the published index is installed and selected.
 EOF
 }
 
@@ -17,6 +20,9 @@ install_directory=${VITASDK:-/usr/local/vitasdk}
 url=${VITASDK_BOOTSTRAP_URL:-}
 expected_sha256=${VITASDK_BOOTSTRAP_SHA256:-}
 local_archive=${VITASDK_BOOTSTRAP_ARCHIVE:-}
+# Empty means the series was never decided: an install from an explicit URL or
+# from a local archive selects no series, and does not pretend to.
+channel=${VITASDK_CHANNEL:-}
 
 while (( $# > 0 )); do
 	case $1 in
@@ -101,41 +107,46 @@ if [[ -z $local_archive && ( -z $url || -z $expected_sha256 ) ]]; then
 	}
 	printf 'Detecting VitaSDK bootstrap archive for %s...\n' "$host" >&2
 
-	channel=${VITASDK_CHANNEL:-stable}
 	manifest_base=${VITASDK_CHANNEL_BASE_URL:-https://vitasdk.github.io/channels}
+
+	# Nothing requested, or the `stable` alias: the index says which series is
+	# supported today. `stable` is not a channel and never was one -- there is
+	# no stable.json to fetch -- so it is resolved here and never stored, the
+	# way `latest` names a Docker image without being one.
+	if [[ -z $channel || $channel == stable ]]; then
+		index_content=$(download_to_string "$manifest_base/index.json") || {
+			printf 'Could not read the release index at %s/index.json\n' "$manifest_base" >&2
+			exit 1
+		}
+		# Series are named YYYY.MM, so the newest one is the highest year and
+		# then the highest month.
+		channel=$(printf '%s' "$index_content" |
+			grep -o '"[^"]*":{"status":"supported"' | cut -d'"' -f2 |
+			sort -t. -k1,1nr -k2,2nr | head -n1)
+		[[ -n $channel ]] || {
+			printf 'The release index at %s lists no supported series\n' "$manifest_base" >&2
+			exit 1
+		}
+		printf 'Installing the supported series %s\n' "$channel" >&2
+	fi
+
+	# No fallback to anything else. Installing a series nobody asked for -- as
+	# resolving `stable` to the nightly used to do -- hands somebody the
+	# development channel while they believe they asked for the stable one.
 	manifest_url="$manifest_base/$channel.json"
-	manifest_content=$(download_to_string "$manifest_url" || true)
-
-	if [[ -z $manifest_content && $channel == stable ]]; then
-		manifest_url="$manifest_base/nightly.json"
-		manifest_content=$(download_to_string "$manifest_url" || true)
-	fi
-
-	if [[ -n $manifest_content ]]; then
-		release_tag=$(printf '%s' "$manifest_content" | grep -o '"release":"[^"]*"' | head -n1 | cut -d'"' -f4)
-		if [[ -n $release_tag ]]; then
-			resolved_url="https://github.com/vitasdk/autobuilds/releases/download/$release_tag/vitasdk-bootstrap-$host.tar.bz2"
-			if [[ -z $url ]]; then
-				url=$resolved_url
-			fi
-		fi
-	fi
-
-	if [[ -z $url ]]; then
-		releases_json=$(download_to_string "https://api.github.com/repos/vitasdk/autobuilds/releases" || true)
-		if [[ -n $releases_json ]]; then
-			resolved_url=$(printf '%s' "$releases_json" | grep -o '"browser_download_url": *"[^"]*"' | grep "vitasdk-bootstrap-$host.tar.bz2" | head -n1 | sed 's/.*"\(https:[^"]*\)".*/\1/')
-			if [[ -n $resolved_url ]]; then
-				url=$resolved_url
-			fi
-		fi
-	fi
-
-	[[ -n $url ]] || {
-		printf 'Could not automatically resolve VitaSDK bootstrap archive for %s\n' "$host" >&2
-		printf 'Please specify --url URL and --sha256 HEX manually\n' >&2
+	manifest_content=$(download_to_string "$manifest_url") || {
+		printf 'Could not read the %s manifest at %s\n' "$channel" "$manifest_url" >&2
 		exit 1
 	}
+
+	release_tag=$(printf '%s' "$manifest_content" | grep -o '"release":"[^"]*"' | head -n1 | cut -d'"' -f4)
+	[[ -n $release_tag ]] || {
+		printf 'The %s manifest names no core release\n' "$channel" >&2
+		exit 1
+	}
+	if [[ -z $url ]]; then
+		url="https://github.com/vitasdk/autobuilds/releases/download/$release_tag/vitasdk-bootstrap-$host.tar.bz2"
+	fi
 
 	if [[ -z $expected_sha256 ]]; then
 		sidecar_content=$(download_to_string "${url}.sha256" || true)
@@ -264,7 +275,23 @@ done
 "$vdpm_binary" --help >/dev/null
 "$pacman_binary" --version >/dev/null
 
+installed_vdpm="$install_directory/${vdpm_binary#"$staging_directory"/}"
+
 mv "$staging_directory" "$install_directory"
 printf 'VitaSDK installed at %s\n' "$install_directory"
+
+# The series has to be written into the SDK, not merely used to pick an
+# archive and then forgotten. Without this the new SDK has no repositories at
+# all and its series is decided by whatever is typed next, so a core installed
+# from one series can end up refreshed onto another with nothing objecting.
+if [[ -n $channel ]]; then
+	VITASDK=$install_directory "$installed_vdpm" refresh "$channel" || {
+		printf 'The SDK is installed but no series is selected. Run:\n' >&2
+		printf '  VITASDK=%q %q refresh %s\n' \
+			"$install_directory" "$installed_vdpm" "$channel" >&2
+		exit 1
+	}
+fi
+
 printf 'export VITASDK=%q\n' "$install_directory"
 printf '%s\n' 'export PATH=$VITASDK/bin:$PATH'

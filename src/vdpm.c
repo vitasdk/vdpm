@@ -724,11 +724,17 @@ int main(int argc, char **argv)
 	if (command == COMMAND_REFRESH) {
 		if (argc - input > 1) {
 			free(root);
-			return fail("refresh accepts at most one channel");
+			return fail("refresh accepts at most one series");
+		}
+		/* No default. Refresh is what moves somebody between series, and
+		 * the name it used to assume -- stable -- is not a series. */
+		if (input >= argc) {
+			free(root);
+			return fail("refresh requires a series; run `vdpm channels` to see them");
 		}
 #ifdef _WIN32
 		status = run_windows_script(root, "share/vdpm/refresh-repositories.ps1",
-			input < argc ? argv[input] : "stable");
+			argv[input]);
 		free(root);
 		return status;
 #else
@@ -745,7 +751,7 @@ int main(int argc, char **argv)
 				return status;
 			}
 			refresh_arguments[0] = refresh;
-			refresh_arguments[1] = input < argc ? argv[input] : "stable";
+			refresh_arguments[1] = argv[input];
 			refresh_arguments[2] = NULL;
 			status = run_process(refresh, refresh_arguments);
 			free(refresh);
