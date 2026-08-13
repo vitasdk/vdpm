@@ -9,6 +9,8 @@
  *   vdpm-channel verify   MANIFEST SIGNATURE PUBLIC_KEY
  *   vdpm-channel validate MANIFEST CHANNEL HOST
  *   vdpm-channel field    MANIFEST CHANNEL HOST FIELD
+ *   vdpm-channel describe MANIFEST
+ *   vdpm-channel series   INDEX
  *   vdpm-channel sha256   FILE
  *
  * The manifest grammar accepted here is deliberately narrower than JSON. A
@@ -696,6 +698,95 @@ static int command_field(const struct manifest *manifest, const char *field)
 	return 1;
 }
 
+static int command_describe(const char *path)
+{
+	/* What a stored manifest says, for a client that already trusted it at
+	 * refresh time and now only wants to show it. No channel is passed in
+	 * because the question is precisely "which one am I on". */
+	unsigned char *data;
+	size_t size;
+	const char *error = NULL;
+	struct node *root;
+	const struct node *sequence;
+	const char *channel;
+
+	if (!read_file(path, &data, &size, MANIFEST_LIMIT))
+		return 1;
+	root = parse_manifest(data, size, &error);
+	free(data);
+	if (!root) {
+		report(error, path);
+		return 1;
+	}
+	channel = string_of(root, "channel");
+	sequence = lookup(root, "sequence");
+	if (!channel || !sequence || sequence->type != NODE_INTEGER) {
+		report("not a channel manifest", path);
+		node_free(root);
+		return 1;
+	}
+	printf("channel\t%s\n", channel);
+	printf("sequence\t%llu\n", sequence->integer);
+	{
+		const struct node *core = lookup(root, "core");
+		const struct node *packages = lookup(root, "packages");
+		const char *value;
+
+		if (core && (value = string_of(core, "release")))
+			printf("core\t%s\n", value);
+		if (core && (value = string_of(core, "repository")))
+			printf("core_repository\t%s\n", value);
+		if (packages && (value = string_of(packages, "release")))
+			printf("packages\t%s\n", value);
+		if (packages && (value = string_of(packages, "repository")))
+			printf("packages_repository\t%s\n", value);
+	}
+	node_free(root);
+	return 0;
+}
+
+static int command_series(const char *path)
+{
+	/* The release index: which series exist and what state each is in.
+	 * Ubuntu publishes the same thing as meta-release, and for the same
+	 * reason: without it a release nobody has heard of is undiscoverable,
+	 * and one that has ended cannot say so. */
+	unsigned char *data;
+	size_t size;
+	const char *error = NULL;
+	struct node *root;
+	const struct node *schema_version;
+	const struct node *channels;
+	const struct member *member;
+
+	if (!read_file(path, &data, &size, MANIFEST_LIMIT))
+		return 1;
+	root = parse_manifest(data, size, &error);
+	free(data);
+	if (!root) {
+		report(error, path);
+		return 1;
+	}
+	schema_version = lookup(root, "schema_version");
+	channels = lookup(root, "channels");
+	if (!schema_version || schema_version->type != NODE_INTEGER ||
+	    schema_version->integer != 1 || !channels ||
+	    channels->type != NODE_OBJECT) {
+		report("not a release index", path);
+		node_free(root);
+		return 1;
+	}
+	for (member = channels->members; member; member = member->next) {
+		const char *status = string_of(member->value, "status");
+		const char *summary = string_of(member->value, "summary");
+
+		printf("%s\t%s\t%s\n", member->key, status ? status : "unknown",
+		       summary ? summary : "");
+	}
+	node_free(root);
+	return 0;
+}
+
 static int command_sha256(const char *path)
 {
 	FILE *stream = fopen(path, "rb");
@@ -746,8 +837,10 @@ static int usage(void)
 		"usage: %s verify   MANIFEST SIGNATURE PUBLIC_KEY\n"
 		"       %s validate MANIFEST CHANNEL HOST\n"
 		"       %s field    MANIFEST CHANNEL HOST FIELD\n"
+		"       %s describe MANIFEST\n"
+		"       %s series   INDEX\n"
 		"       %s sha256   FILE\n",
-		program, program, program, program);
+		program, program, program, program, program, program);
 	return 2;
 }
 
@@ -768,6 +861,16 @@ int main(int argc, char **argv)
 		if (argc != 3)
 			return usage();
 		return command_sha256(argv[2]);
+	}
+	if (strcmp(command, "describe") == 0) {
+		if (argc != 3)
+			return usage();
+		return command_describe(argv[2]);
+	}
+	if (strcmp(command, "series") == 0) {
+		if (argc != 3)
+			return usage();
+		return command_series(argv[2]);
 	}
 	if (strcmp(command, "validate") == 0 || strcmp(command, "field") == 0) {
 		int wants_field = strcmp(command, "field") == 0;

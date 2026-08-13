@@ -69,6 +69,11 @@ if(BUILD_TESTING AND UNIX)
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-channel-manifest.sh")
     add_test(NAME vdpm-release-bundle-contract
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-release-bundle.sh")
+    add_test(NAME vdpm-release-banner
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-channel-status.sh")
+    set_tests_properties(vdpm-release-banner PROPERTIES
+        ENVIRONMENT "VDPM_TEST_BUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}/src"
+        SKIP_RETURN_CODE 77)
     add_test(NAME vdpm-channel-names
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-channel-names.sh")
     add_test(NAME vdpm-bootstrap-contract

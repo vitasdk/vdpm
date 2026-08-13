@@ -34,7 +34,9 @@ enum command {
 	COMMAND_INFO,
 	COMMAND_FILES,
 	COMMAND_PACMAN,
-	COMMAND_REFRESH
+	COMMAND_REFRESH,
+	COMMAND_CHANNELS,
+	COMMAND_STATUS
 };
 
 static const char *program_name = "vdpm";
@@ -53,7 +55,9 @@ static void usage(FILE *stream)
 		"  vdpm info PACKAGE...\n"
 		"  vdpm files PACKAGE...\n"
 		"  vdpm pacman [--] ARG...\n"
-		"  vdpm refresh [stable|nightly]\n"
+		"  vdpm refresh [CHANNEL]\n"
+		"  vdpm channels\n"
+		"  vdpm status\n"
 		"\n"
 		"Compatibility:\n"
 		"  vdpm PACKAGE...       Same as `vdpm install PACKAGE...`\n"
@@ -329,6 +333,98 @@ static int run_windows_refresh(const char *root, const char *channel)
 }
 #endif
 
+/*
+ * Every operation says which release it is acting on.
+ *
+ * Otherwise the answer to "which VitaSDK is this?" lives in a JSON file
+ * nobody opens, and a person can spend an afternoon on a bug that is really
+ * "you are on last year's release". It is printed before the work starts, so
+ * it is on screen even when the operation fails.
+ *
+ * Nothing here can stop an operation: if the banner cannot be produced, the
+ * command runs anyway.
+ */
+static void print_release_banner(const char *root)
+{
+	char *tool = join_path(root, "bin/vdpm-channel");
+	char *manifest = join_path(root, "var/lib/vdpm/channel.json");
+	char *index = join_path(root, "var/lib/vdpm/index.json");
+	char channel[128] = "";
+	char sequence[64] = "";
+	char command[2048];
+	char line[1024];
+	FILE *pipe;
+
+	if (!tool || !manifest || !index)
+		goto out;
+	if (access(manifest, 0) != 0)
+		goto out;
+
+	snprintf(command, sizeof(command), "\"%s\" describe \"%s\" 2>/dev/null",
+		 tool, manifest);
+	pipe = popen(command, "r");
+	if (!pipe)
+		goto out;
+	while (fgets(line, sizeof(line), pipe)) {
+		char *tab = strchr(line, '\t');
+		char *newline;
+
+		if (!tab)
+			continue;
+		*tab = '\0';
+		newline = strchr(tab + 1, '\n');
+		if (newline)
+			*newline = '\0';
+		if (strcmp(line, "channel") == 0)
+			snprintf(channel, sizeof(channel), "%s", tab + 1);
+		else if (strcmp(line, "sequence") == 0)
+			snprintf(sequence, sizeof(sequence), "%s", tab + 1);
+	}
+	pclose(pipe);
+
+	if (!channel[0])
+		goto out;
+	fprintf(stderr, ":: VitaSDK %s", channel);
+	if (sequence[0])
+		fprintf(stderr, " (sequence %s)", sequence);
+	fputc('\n', stderr);
+
+	/* A release that has ended still installs exactly as it did; what it
+	 * must not do is stay silent about it. */
+	if (access(index, 0) != 0)
+		goto out;
+	snprintf(command, sizeof(command), "\"%s\" series \"%s\" 2>/dev/null",
+		 tool, index);
+	pipe = popen(command, "r");
+	if (!pipe)
+		goto out;
+	while (fgets(line, sizeof(line), pipe)) {
+		char *first = strchr(line, '\t');
+		char *second;
+
+		if (!first)
+			continue;
+		*first = '\0';
+		if (strcmp(line, channel) != 0)
+			continue;
+		second = strchr(first + 1, '\t');
+		if (second)
+			*second = '\0';
+		if (strcmp(first + 1, "end-of-life") == 0)
+			fprintf(stderr, ":: %s is no longer maintained; "
+				"`vdpm channels` lists what is current\n", channel);
+		else if (strcmp(first + 1, "deprecated") == 0)
+			fprintf(stderr, ":: %s is deprecated; "
+				"`vdpm channels` lists what replaces it\n", channel);
+	}
+	pclose(pipe);
+
+out:
+	free(tool);
+	free(manifest);
+	free(index);
+}
+
 static int command_from_name(const char *name, enum command *command)
 {
 	if (strcmp(name, "install") == 0)
@@ -349,6 +445,10 @@ static int command_from_name(const char *name, enum command *command)
 		*command = COMMAND_PACMAN;
 	else if (strcmp(name, "refresh") == 0)
 		*command = COMMAND_REFRESH;
+	else if (strcmp(name, "channels") == 0)
+		*command = COMMAND_CHANNELS;
+	else if (strcmp(name, "status") == 0)
+		*command = COMMAND_STATUS;
 	else
 		return 0;
 	return 1;
@@ -408,6 +508,23 @@ int main(int argc, char **argv)
 	root = normalized_root(root_environment);
 	if (!root)
 		return fail("VITASDK must be an absolute, non-root path");
+	if (command == COMMAND_CHANNELS || command == COMMAND_STATUS) {
+		const char *relative = command == COMMAND_CHANNELS ?
+			"bin/include/list-channels.sh" : "bin/include/show-status.sh";
+		char *script = join_path(root, relative);
+		char *script_arguments[2];
+
+		if (!script) {
+			free(root);
+			return fail("out of memory");
+		}
+		script_arguments[0] = script;
+		script_arguments[1] = NULL;
+		status = run_process(script, script_arguments);
+		free(script);
+		free(root);
+		return status;
+	}
 	if (command == COMMAND_REFRESH) {
 		if (argc - input > 1) {
 			free(root);
@@ -541,6 +658,8 @@ int main(int argc, char **argv)
 			return fail("pacman requires at least one argument");
 		break;
 	case COMMAND_REFRESH:
+	case COMMAND_CHANNELS:
+	case COMMAND_STATUS:
 		/* Handled immediately after validating the SDK root. */
 		break;
 	}
@@ -548,6 +667,10 @@ int main(int argc, char **argv)
 	while (input < argc)
 		append_argument(arguments, &argument_count, argv[input++]);
 	arguments[argument_count] = NULL;
+	/* Not for the raw passthrough: `vdpm pacman` is the escape hatch and
+	 * its output is often piped into something else. */
+	if (command != COMMAND_PACMAN)
+		print_release_banner(root);
 	status = run_process(pacman, arguments);
 	free(arguments);
 	free(log);
