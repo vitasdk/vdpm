@@ -26,7 +26,8 @@ chmod +x "$root/bin/pacman"
 
 manifest()
 {
-	printf '%s\n' "{\"channel\":\"$1\",\"core\":{\"release\":\"core-1\",\"repository\":\"vitasdk/autobuilds\"},\"packages\":{\"release\":\"packages-1\",\"repository\":\"vitasdk/vitasdk-autobuild\"},\"schema_version\":1,\"sequence\":7}" \
+	local deprecated=${2:-}
+	printf '%s\n' "{\"channel\":\"$1\",\"core\":{\"release\":\"core-1\",\"repository\":\"vitasdk/autobuilds\"},\"packages\":{${deprecated}\"release\":\"packages-1\",\"repository\":\"vitasdk/vitasdk-autobuild\"},\"schema_version\":1,\"sequence\":7}" \
 		> "$root/var/lib/vdpm/channel.json"
 }
 
@@ -72,6 +73,19 @@ check "end of life" "$output" "no longer maintained"
 manifest 2026.09
 output=$(VITASDK="$root" "$build/vdpm" install zlib 2>&1)
 check_absent "supported" "$output" "no longer maintained"
+
+# Deprecating is not removing: the install still happens, it just says so,
+# and only for the package that was actually asked for.
+manifest 2026.09 '"deprecated":{"cpython":"Python 2 is unsupported; use cpython3"},'
+output=$(VITASDK="$root" "$build/vdpm" install cpython zlib 2>&1)
+check "deprecated" "$output" "cpython is deprecated: Python 2 is unsupported"
+if ! VITASDK="$root" "$build/vdpm" install cpython >/dev/null 2>&1; then
+	echo "a deprecated package could not be installed; that is removal, not deprecation" >&2
+	failures=$((failures + 1))
+fi
+
+output=$(VITASDK="$root" "$build/vdpm" install zlib 2>&1)
+check_absent "unrelated package" "$output" "is deprecated"
 
 # A banner must never be the reason a command fails.
 rm -f "$root/var/lib/vdpm/channel.json"

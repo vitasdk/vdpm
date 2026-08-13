@@ -425,6 +425,55 @@ out:
 	free(index);
 }
 
+/*
+ * Warns about packages that should not be built on any more.
+ *
+ * Named on the command line, so the warning lands next to the thing being
+ * asked for rather than in a list nobody reads. Deprecating is not removing:
+ * the install still happens, because everything already depending on it keeps
+ * working and taking that decision away helps nobody.
+ */
+static void warn_about_deprecated(const char *root, char **argv, int first, int argc)
+{
+	char *tool = join_path(root, "bin/vdpm-channel");
+	char *manifest = join_path(root, "var/lib/vdpm/channel.json");
+	char command[2048];
+	char line[1024];
+	FILE *pipe;
+	int index;
+
+	if (!tool || !manifest || first >= argc)
+		goto out;
+	if (access(manifest, 0) != 0)
+		goto out;
+
+	snprintf(command, sizeof(command), "\"%s\" deprecated \"%s\" 2>/dev/null",
+		 tool, manifest);
+	pipe = popen(command, "r");
+	if (!pipe)
+		goto out;
+	while (fgets(line, sizeof(line), pipe)) {
+		char *tab = strchr(line, '\t');
+		char *newline;
+
+		if (!tab)
+			continue;
+		*tab = '\0';
+		newline = strchr(tab + 1, '\n');
+		if (newline)
+			*newline = '\0';
+		for (index = first; index < argc; index++)
+			if (strcmp(argv[index], line) == 0)
+				fprintf(stderr, ":: %s is deprecated: %s\n",
+					line, tab + 1);
+	}
+	pclose(pipe);
+
+out:
+	free(tool);
+	free(manifest);
+}
+
 static int command_from_name(const char *name, enum command *command)
 {
 	if (strcmp(name, "install") == 0)
@@ -474,6 +523,7 @@ int main(int argc, char **argv)
 	char **arguments;
 	int argument_count = 0;
 	int input = 1;
+	int operands;
 	int force = 0;
 	int status;
 	enum command command = COMMAND_INSTALL;
@@ -664,13 +714,19 @@ int main(int argc, char **argv)
 		break;
 	}
 
+	/* Where the names the user asked for start, before the loop below
+	 * consumes them. */
+	operands = input;
 	while (input < argc)
 		append_argument(arguments, &argument_count, argv[input++]);
 	arguments[argument_count] = NULL;
 	/* Not for the raw passthrough: `vdpm pacman` is the escape hatch and
 	 * its output is often piped into something else. */
-	if (command != COMMAND_PACMAN)
+	if (command != COMMAND_PACMAN) {
 		print_release_banner(root);
+		if (command == COMMAND_INSTALL)
+			warn_about_deprecated(root, argv, operands, argc);
+	}
 	status = run_process(pacman, arguments);
 	free(arguments);
 	free(log);

@@ -11,6 +11,7 @@
  *   vdpm-channel field    MANIFEST CHANNEL HOST FIELD
  *   vdpm-channel describe MANIFEST
  *   vdpm-channel series   INDEX
+ *   vdpm-channel deprecated MANIFEST
  *   vdpm-channel sha256   FILE
  *
  * The manifest grammar accepted here is deliberately narrower than JSON. A
@@ -745,6 +746,38 @@ static int command_describe(const char *path)
 	return 0;
 }
 
+static int command_deprecated(const char *path)
+{
+	/* The packages a manifest says nobody should start something new on.
+	 * Printed as name and reason so a caller can match without parsing
+	 * anything itself. A manifest that carries none is not an error: most
+	 * of them do not. */
+	unsigned char *data;
+	size_t size;
+	const char *error = NULL;
+	struct node *root;
+	const struct node *packages;
+	const struct node *deprecated;
+	const struct member *member;
+
+	if (!read_file(path, &data, &size, MANIFEST_LIMIT))
+		return 1;
+	root = parse_manifest(data, size, &error);
+	free(data);
+	if (!root) {
+		report(error, path);
+		return 1;
+	}
+	packages = lookup(root, "packages");
+	deprecated = packages ? lookup(packages, "deprecated") : NULL;
+	if (deprecated && deprecated->type == NODE_OBJECT)
+		for (member = deprecated->members; member; member = member->next)
+			if (member->value->type == NODE_STRING)
+				printf("%s\t%s\n", member->key, member->value->text);
+	node_free(root);
+	return 0;
+}
+
 static int command_series(const char *path)
 {
 	/* The release index: which series exist and what state each is in.
@@ -839,8 +872,9 @@ static int usage(void)
 		"       %s field    MANIFEST CHANNEL HOST FIELD\n"
 		"       %s describe MANIFEST\n"
 		"       %s series   INDEX\n"
+		"       %s deprecated MANIFEST\n"
 		"       %s sha256   FILE\n",
-		program, program, program, program, program, program);
+		program, program, program, program, program, program, program);
 	return 2;
 }
 
@@ -866,6 +900,11 @@ int main(int argc, char **argv)
 		if (argc != 3)
 			return usage();
 		return command_describe(argv[2]);
+	}
+	if (strcmp(command, "deprecated") == 0) {
+		if (argc != 3)
+			return usage();
+		return command_deprecated(argv[2]);
 	}
 	if (strcmp(command, "series") == 0) {
 		if (argc != 3)
