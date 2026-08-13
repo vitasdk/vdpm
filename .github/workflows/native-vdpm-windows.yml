@@ -10,6 +10,7 @@ on:
       - .github/workflows/native-vdpm-windows.yml
   push:
     branches:
+      - master
       - next
     paths:
       - CMakeLists.txt

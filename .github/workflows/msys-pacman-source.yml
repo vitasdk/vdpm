@@ -12,6 +12,7 @@ on:
       - .github/workflows/msys-pacman-source.yml
   push:
     branches:
+      - master
       - next
     paths:
       - .gitattributes

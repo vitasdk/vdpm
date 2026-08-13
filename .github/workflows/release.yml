@@ -15,7 +15,7 @@ on:
       - tests/test-release-bundle.sh
       - .github/workflows/release.yml
   push:
-    branches: [next]
+    branches: [master, next]
     tags: ['v*']
   workflow_dispatch:
 
