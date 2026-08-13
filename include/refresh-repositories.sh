@@ -2,9 +2,18 @@
 
 set -euo pipefail
 
-channel=${1:-stable}
-[[ $channel == stable || $channel == nightly ]] || {
-	printf 'unsupported channel: %s\n' "$channel" >&2
+# No argument means the default channel; an empty one is a mistake, and
+# quietly turning it into stable would move somebody off their release.
+channel=${1-stable}
+# A channel is a name, not a fixed list: a release series is a channel that
+# lives as long as the release does, so 2026.09 has to be sayable. It is
+# still checked, because the name goes into a URL and a file path.
+[[ $channel =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || {
+	printf 'invalid channel name: %s\n' "$channel" >&2
+	exit 1
+}
+[[ $channel != *..* ]] || {
+	printf 'invalid channel name: %s\n' "$channel" >&2
 	exit 1
 }
 [[ -n ${VITASDK:-} ]] || exit 1

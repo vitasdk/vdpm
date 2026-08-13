@@ -1,5 +1,7 @@
 param(
-    [ValidateSet("stable", "nightly")]
+    # Not a fixed list: a release series is a channel, so 2026.09 has to be
+    # sayable. Still checked, because the name goes into a URL and a path.
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9._-]*$')]
     [string]$Channel = "stable"
 )
 
