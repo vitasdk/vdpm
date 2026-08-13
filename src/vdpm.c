@@ -20,13 +20,7 @@
 #define mkdir_one(path) _mkdir(path)
 #define popen _popen
 #define pclose _pclose
-/* _popen hands the line to `cmd /c`, and cmd strips the outermost pair of
- * quotes from what it receives. A command whose program and whose argument are
- * both quoted therefore arrives with its quoting rearranged, and Windows
- * answers "the filename, directory name, or volume label syntax is incorrect".
- * The documented answer is one more pair around the whole line. */
-#define COMMAND_OPEN "\""
-#define COMMAND_CLOSE "\""
+/* There is no /dev/null here, and a redirect to it is itself an error. */
 #define DISCARD_ERRORS "2>NUL"
 #define CHANNEL_TOOL "bin/vdpm-channel.exe"
 #else
@@ -34,8 +28,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #define mkdir_one(path) mkdir((path), 0777)
-#define COMMAND_OPEN ""
-#define COMMAND_CLOSE ""
 #define DISCARD_ERRORS "2>/dev/null"
 #define CHANNEL_TOOL "bin/vdpm-channel"
 #endif
@@ -382,7 +374,7 @@ static void print_release_banner(const char *root)
 		goto out;
 
 	snprintf(command, sizeof(command),
-		 COMMAND_OPEN "\"%s\" describe \"%s\" " DISCARD_ERRORS COMMAND_CLOSE,
+		 "\"%s\" describe \"%s\" " DISCARD_ERRORS,
 		 tool, manifest);
 	pipe = popen(command, "r");
 	if (!pipe)
@@ -416,7 +408,7 @@ static void print_release_banner(const char *root)
 	if (access(index, 0) != 0)
 		goto out;
 	snprintf(command, sizeof(command),
-		 COMMAND_OPEN "\"%s\" series \"%s\" " DISCARD_ERRORS COMMAND_CLOSE,
+		 "\"%s\" series \"%s\" " DISCARD_ERRORS,
 		 tool, index);
 	pipe = popen(command, "r");
 	if (!pipe)
@@ -477,12 +469,10 @@ static int refuse_self_replacement(char **base, int base_count)
 	int index;
 	int found = 0;
 
-	offset += snprintf(command + offset, sizeof(command) - offset, COMMAND_OPEN);
 	for (index = 0; index < base_count && base[index]; index++)
 		offset += snprintf(command + offset, sizeof(command) - offset,
 				   "\"%s\" ", base[index]);
-	snprintf(command + offset, sizeof(command) - offset,
-		 "--query --upgrades" COMMAND_CLOSE);
+	snprintf(command + offset, sizeof(command) - offset, "--query --upgrades");
 
 	pipe = popen(command, "r");
 	if (!pipe)
@@ -528,8 +518,7 @@ static int print_status(const char *root)
 		goto out;
 	}
 
-	snprintf(command, sizeof(command),
-		 COMMAND_OPEN "\"%s\" describe \"%s\"" COMMAND_CLOSE, tool, manifest);
+	snprintf(command, sizeof(command), "\"%s\" describe \"%s\"", tool, manifest);
 	pipe = popen(command, "r");
 	if (!pipe)
 		goto out;
