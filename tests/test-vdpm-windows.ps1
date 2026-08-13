@@ -14,6 +14,23 @@ function Write-UnixText([string]$Path, [string[]]$Lines) {
     [IO.File]::WriteAllText($Path, ($Lines -join "`n") + "`n")
 }
 
+# A command that is expected to fail, with its complaint captured. Kept out of
+# the success stream on purpose: merging a native program's stderr with 2>&1
+# raises NativeCommandError under $ErrorActionPreference = "Stop", so the
+# assertion would never be reached.
+function Invoke-Failing([string]$Program, [string[]]$Arguments, [string]$LogPath) {
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & $Program @Arguments 2> $LogPath
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $previous
+    $text = ""
+    if (Test-Path -LiteralPath $LogPath) {
+        $text = Get-Content -Raw -LiteralPath $LogPath
+    }
+    return [pscustomobject]@{ Code = $code; Text = $text }
+}
+
 function Assert-Sha256([string]$Path, [string]$Expected) {
     $actual = (Get-FileHash -Algorithm SHA256 -Path $Path).Hash.ToLowerInvariant()
     if ($actual -ne $Expected) {
@@ -162,20 +179,33 @@ try {
         throw "vdpm left the package payload after removal"
     }
 
-    # Reading which release this is has to work where there is no shell to
-    # lean on, which is the whole reason it is not a script.
+    # No channel has been selected yet, and saying so is the answer.
+    $statusLog = Join-Path $WorkDirectory "status.err"
+    $reported = Invoke-Failing $vdpm @("status") $statusLog
+    if ($reported.Code -eq 0) {
+        throw "vdpm status reported a release with no channel configured"
+    }
+    if ($reported.Text -notmatch "no channel configured") {
+        throw "vdpm status did not say that no channel is configured"
+    }
+
+    # This fixture installs the frontend and nothing else, so it is an SDK
+    # with no channel tool -- a real state on a partial install, and one the
+    # command has to name instead of leaving the shell to explain. Status
+    # against a complete bundle is exercised where one is staged, in
+    # tests/test-channel-refresh-windows.ps1.
     $manifest = Join-Path $env:VITASDK "var/lib/vdpm/channel.json"
     New-Item -ItemType Directory -Path (Split-Path $manifest) -Force | Out-Null
     Set-Content -LiteralPath $manifest -NoNewline -Value (
         '{"channel":"2026.09","core":{"release":"core-1","repository":"vitasdk/autobuilds"},' +
         '"packages":{"release":"packages-1","repository":"vitasdk/vitasdk-autobuild"},' +
         '"schema_version":1,"sequence":7}' + "`n")
-    $reported = @(& $vdpm status)
-    if ($LASTEXITCODE -ne 0) {
-        throw "vdpm status failed on Windows"
+    $reported = Invoke-Failing $vdpm @("status") $statusLog
+    if ($reported.Code -eq 0) {
+        throw "vdpm status reported a release without a channel tool"
     }
-    if (-not ($reported -join "`n").Contains("2026.09")) {
-        throw "vdpm status did not name the release"
+    if ($reported.Text -notmatch "no channel tool") {
+        throw "vdpm status did not say the channel tool is missing"
     }
 }
 finally {
