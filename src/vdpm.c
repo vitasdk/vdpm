@@ -163,6 +163,24 @@ static char *join_path(const char *left, const char *right)
 	return result;
 }
 
+/* Every path here is built with forward slashes. That is fine for the calls
+ * that execute a program directly -- CreateProcess accepts them, which is why
+ * refresh works on Windows -- and wrong for the ones that go through popen:
+ * there the line is parsed by cmd, which resolves the program with Windows
+ * path rules, where a forward slash begins a switch. cmd answers "the
+ * filename, directory name, or volume label syntax is incorrect", which is
+ * what `vdpm status` said on Windows instead of working. */
+static void to_native_separators(char *path)
+{
+#ifdef _WIN32
+	for (; path && *path; path++)
+		if (*path == '/')
+			*path = '\\';
+#else
+	(void)path;
+#endif
+}
+
 static int make_directories(const char *path)
 {
 	char *copy = duplicate_string(path);
@@ -360,6 +378,8 @@ static int run_windows_script(const char *root, const char *relative,
 static void print_release_banner(const char *root)
 {
 	char *tool = join_path(root, CHANNEL_TOOL);
+
+	to_native_separators(tool);
 	char *manifest = join_path(root, "var/lib/vdpm/channel.json");
 	char *index = join_path(root, "var/lib/vdpm/index.json");
 	char channel[128] = "";
@@ -469,9 +489,15 @@ static int refuse_self_replacement(char **base, int base_count)
 	int index;
 	int found = 0;
 
-	for (index = 0; index < base_count && base[index]; index++)
+	for (index = 0; index < base_count && base[index]; index++) {
+		/* Only the first element is the program cmd has to resolve. */
+		char *native = index == 0 ? duplicate_string(base[index]) : NULL;
+
+		to_native_separators(native);
 		offset += snprintf(command + offset, sizeof(command) - offset,
-				   "\"%s\" ", base[index]);
+				   "\"%s\" ", native ? native : base[index]);
+		free(native);
+	}
 	snprintf(command + offset, sizeof(command) - offset, "--query --upgrades");
 
 	pipe = popen(command, "r");
@@ -502,6 +528,8 @@ static int print_status(const char *root)
 	/* Native rather than a shell script: this has to answer "which VitaSDK
 	 * is this?" on every platform, and Windows has no shell to lean on. */
 	char *tool = join_path(root, CHANNEL_TOOL);
+
+	to_native_separators(tool);
 	char *manifest = join_path(root, "var/lib/vdpm/channel.json");
 	char *index = join_path(root, "var/lib/vdpm/index.json");
 	char command[2048];
@@ -577,6 +605,8 @@ out:
 static void warn_about_deprecated(const char *root, char **argv, int first, int argc)
 {
 	char *tool = join_path(root, CHANNEL_TOOL);
+
+	to_native_separators(tool);
 	char *manifest = join_path(root, "var/lib/vdpm/channel.json");
 	char command[2048];
 	char line[1024];
@@ -588,8 +618,8 @@ static void warn_about_deprecated(const char *root, char **argv, int first, int 
 	if (access(manifest, 0) != 0)
 		goto out;
 
-	snprintf(command, sizeof(command), "\"%s\" deprecated \"%s\" 2>/dev/null",
-		 tool, manifest);
+	snprintf(command, sizeof(command),
+		 "\"%s\" deprecated \"%s\" " DISCARD_ERRORS, tool, manifest);
 	pipe = popen(command, "r");
 	if (!pipe)
 		goto out;
