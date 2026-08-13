@@ -20,11 +20,24 @@
 #define mkdir_one(path) _mkdir(path)
 #define popen _popen
 #define pclose _pclose
+/* _popen hands the line to `cmd /c`, and cmd strips the outermost pair of
+ * quotes from what it receives. A command whose program and whose argument are
+ * both quoted therefore arrives with its quoting rearranged, and Windows
+ * answers "the filename, directory name, or volume label syntax is incorrect".
+ * The documented answer is one more pair around the whole line. */
+#define COMMAND_OPEN "\""
+#define COMMAND_CLOSE "\""
+#define DISCARD_ERRORS "2>NUL"
+#define CHANNEL_TOOL "bin/vdpm-channel.exe"
 #else
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 #define mkdir_one(path) mkdir((path), 0777)
+#define COMMAND_OPEN ""
+#define COMMAND_CLOSE ""
+#define DISCARD_ERRORS "2>/dev/null"
+#define CHANNEL_TOOL "bin/vdpm-channel"
 #endif
 
 enum command {
@@ -354,7 +367,7 @@ static int run_windows_script(const char *root, const char *relative,
  */
 static void print_release_banner(const char *root)
 {
-	char *tool = join_path(root, "bin/vdpm-channel");
+	char *tool = join_path(root, CHANNEL_TOOL);
 	char *manifest = join_path(root, "var/lib/vdpm/channel.json");
 	char *index = join_path(root, "var/lib/vdpm/index.json");
 	char channel[128] = "";
@@ -368,7 +381,8 @@ static void print_release_banner(const char *root)
 	if (access(manifest, 0) != 0)
 		goto out;
 
-	snprintf(command, sizeof(command), "\"%s\" describe \"%s\" 2>/dev/null",
+	snprintf(command, sizeof(command),
+		 COMMAND_OPEN "\"%s\" describe \"%s\" " DISCARD_ERRORS COMMAND_CLOSE,
 		 tool, manifest);
 	pipe = popen(command, "r");
 	if (!pipe)
@@ -401,7 +415,8 @@ static void print_release_banner(const char *root)
 	 * must not do is stay silent about it. */
 	if (access(index, 0) != 0)
 		goto out;
-	snprintf(command, sizeof(command), "\"%s\" series \"%s\" 2>/dev/null",
+	snprintf(command, sizeof(command),
+		 COMMAND_OPEN "\"%s\" series \"%s\" " DISCARD_ERRORS COMMAND_CLOSE,
 		 tool, index);
 	pipe = popen(command, "r");
 	if (!pipe)
@@ -462,10 +477,12 @@ static int refuse_self_replacement(char **base, int base_count)
 	int index;
 	int found = 0;
 
+	offset += snprintf(command + offset, sizeof(command) - offset, COMMAND_OPEN);
 	for (index = 0; index < base_count && base[index]; index++)
 		offset += snprintf(command + offset, sizeof(command) - offset,
 				   "\"%s\" ", base[index]);
-	snprintf(command + offset, sizeof(command) - offset, "--query --upgrades");
+	snprintf(command + offset, sizeof(command) - offset,
+		 "--query --upgrades" COMMAND_CLOSE);
 
 	pipe = popen(command, "r");
 	if (!pipe)
@@ -494,7 +511,7 @@ static int print_status(const char *root)
 {
 	/* Native rather than a shell script: this has to answer "which VitaSDK
 	 * is this?" on every platform, and Windows has no shell to lean on. */
-	char *tool = join_path(root, "bin/vdpm-channel");
+	char *tool = join_path(root, CHANNEL_TOOL);
 	char *manifest = join_path(root, "var/lib/vdpm/channel.json");
 	char *index = join_path(root, "var/lib/vdpm/index.json");
 	char command[2048];
@@ -511,7 +528,8 @@ static int print_status(const char *root)
 		goto out;
 	}
 
-	snprintf(command, sizeof(command), "\"%s\" describe \"%s\"", tool, manifest);
+	snprintf(command, sizeof(command),
+		 COMMAND_OPEN "\"%s\" describe \"%s\"" COMMAND_CLOSE, tool, manifest);
 	pipe = popen(command, "r");
 	if (!pipe)
 		goto out;
@@ -569,7 +587,7 @@ out:
 
 static void warn_about_deprecated(const char *root, char **argv, int first, int argc)
 {
-	char *tool = join_path(root, "bin/vdpm-channel");
+	char *tool = join_path(root, CHANNEL_TOOL);
 	char *manifest = join_path(root, "var/lib/vdpm/channel.json");
 	char command[2048];
 	char line[1024];
