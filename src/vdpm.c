@@ -22,7 +22,9 @@
 #define pclose _pclose
 /* There is no /dev/null here, and a redirect to it is itself an error. */
 #define DISCARD_ERRORS "2>NUL"
-#define CHANNEL_TOOL "bin/vdpm-channel.exe"
+/* Where the Windows bundle actually puts it, next to pacman.exe, rather than
+ * in bin/ where the POSIX one lives. */
+#define CHANNEL_TOOL "usr/bin/vdpm-channel.exe"
 #else
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -543,6 +545,14 @@ static int print_status(const char *root)
 	if (access(manifest, 0) != 0) {
 		fprintf(stderr, "%s: no channel configured; run `vdpm refresh` first\n",
 			program_name);
+		goto out;
+	}
+	/* Said plainly. Without this the failure arrives as whatever the shell
+	 * makes of a program that is not there, which says nothing about what
+	 * is missing. */
+	if (access(tool, 0) != 0) {
+		fprintf(stderr, "%s: this SDK carries no channel tool at %s\n",
+			program_name, tool);
 		goto out;
 	}
 
