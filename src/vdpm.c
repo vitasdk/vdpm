@@ -22,6 +22,12 @@
 #define pclose _pclose
 /* There is no /dev/null here, and a redirect to it is itself an error. */
 #define DISCARD_ERRORS "2>NUL"
+/* cmd strips the outermost pair of quotes from the line it is given, so a
+ * command whose program is quoted -- and it has to be, the install path can
+ * contain spaces -- arrives with the program cut at its first space. One more
+ * pair around the whole line survives the stripping. */
+#define COMMAND_OPEN "\""
+#define COMMAND_CLOSE "\""
 /* Where the Windows bundle actually puts it, next to pacman.exe, rather than
  * in bin/ where the POSIX one lives. */
 #define CHANNEL_TOOL "usr/bin/vdpm-channel.exe"
@@ -31,6 +37,8 @@
 #include <unistd.h>
 #define mkdir_one(path) mkdir((path), 0777)
 #define DISCARD_ERRORS "2>/dev/null"
+#define COMMAND_OPEN ""
+#define COMMAND_CLOSE ""
 #define CHANNEL_TOOL "bin/vdpm-channel"
 #endif
 
@@ -396,7 +404,7 @@ static void print_release_banner(const char *root)
 		goto out;
 
 	snprintf(command, sizeof(command),
-		 "\"%s\" describe \"%s\" " DISCARD_ERRORS,
+		 COMMAND_OPEN "\"%s\" describe \"%s\" " DISCARD_ERRORS COMMAND_CLOSE,
 		 tool, manifest);
 	pipe = popen(command, "r");
 	if (!pipe)
@@ -430,7 +438,7 @@ static void print_release_banner(const char *root)
 	if (access(index, 0) != 0)
 		goto out;
 	snprintf(command, sizeof(command),
-		 "\"%s\" series \"%s\" " DISCARD_ERRORS,
+		 COMMAND_OPEN "\"%s\" series \"%s\" " DISCARD_ERRORS COMMAND_CLOSE,
 		 tool, index);
 	pipe = popen(command, "r");
 	if (!pipe)
@@ -491,6 +499,7 @@ static int refuse_self_replacement(char **base, int base_count)
 	int index;
 	int found = 0;
 
+	offset += snprintf(command + offset, sizeof(command) - offset, COMMAND_OPEN);
 	for (index = 0; index < base_count && base[index]; index++) {
 		/* Only the first element is the program cmd has to resolve. */
 		char *native = index == 0 ? duplicate_string(base[index]) : NULL;
@@ -500,7 +509,8 @@ static int refuse_self_replacement(char **base, int base_count)
 				   "\"%s\" ", native ? native : base[index]);
 		free(native);
 	}
-	snprintf(command + offset, sizeof(command) - offset, "--query --upgrades");
+	snprintf(command + offset, sizeof(command) - offset,
+		 "--query --upgrades" COMMAND_CLOSE);
 
 	pipe = popen(command, "r");
 	if (!pipe)
@@ -556,7 +566,8 @@ static int print_status(const char *root)
 		goto out;
 	}
 
-	snprintf(command, sizeof(command), "\"%s\" describe \"%s\"", tool, manifest);
+	snprintf(command, sizeof(command),
+		 COMMAND_OPEN "\"%s\" describe \"%s\"" COMMAND_CLOSE, tool, manifest);
 	pipe = popen(command, "r");
 	if (!pipe)
 		goto out;
@@ -629,7 +640,8 @@ static void warn_about_deprecated(const char *root, char **argv, int first, int 
 		goto out;
 
 	snprintf(command, sizeof(command),
-		 "\"%s\" deprecated \"%s\" " DISCARD_ERRORS, tool, manifest);
+		 COMMAND_OPEN "\"%s\" deprecated \"%s\" " DISCARD_ERRORS COMMAND_CLOSE,
+		 tool, manifest);
 	pipe = popen(command, "r");
 	if (!pipe)
 		goto out;
