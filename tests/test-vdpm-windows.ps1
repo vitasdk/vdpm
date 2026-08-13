@@ -28,6 +28,10 @@ function Invoke-Failing([string]$Program, [string[]]$Arguments, [string]$LogPath
     if (Test-Path -LiteralPath $LogPath) {
         $text = Get-Content -Raw -LiteralPath $LogPath
     }
+    # Cleared deliberately: a script that ends without an explicit exit returns
+    # whatever the last program left here, and the last program here is one
+    # that was meant to fail.
+    $global:LASTEXITCODE = 0
     return [pscustomobject]@{ Code = $code; Text = $text }
 }
 
@@ -215,3 +219,4 @@ finally {
 }
 
 Write-Host "native vdpm -> minimal MSYS pacman Windows test passed"
+exit 0
