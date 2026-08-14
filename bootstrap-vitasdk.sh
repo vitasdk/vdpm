@@ -16,6 +16,16 @@ supported series in the published index is installed and selected.
 EOF
 }
 
+# The root of trust is this script. It names the seed to fetch and the digest
+# of the channel key that seed must contain; the index, the manifest, the
+# databases and the packages are all verified with that key afterwards. A
+# manifest cannot be allowed to name its own verifier, so the chain starts
+# here and not on the network.
+SEED_RELEASE=v0.1.0
+SEED_VERSION=0.1.0
+CHANNEL_KEY_SHA256=c02df2e12216f6f633d94206634bbe8f244d74f610b29e922d7ea8bab2efb307
+
+install_from_packages=0
 install_directory=${VITASDK:-/usr/local/vitasdk}
 url=${VITASDK_BOOTSTRAP_URL:-}
 expected_sha256=${VITASDK_BOOTSTRAP_SHA256:-}
@@ -145,7 +155,12 @@ if [[ -z $local_archive && ( -z $url || -z $expected_sha256 ) ]]; then
 		exit 1
 	}
 	if [[ -z $url ]]; then
-		url="https://github.com/vitasdk/autobuilds/releases/download/$release_tag/vitasdk-bootstrap-$host.tar.bz2"
+		# The seed is the client and nothing else: eight megabytes that can
+		# verify a channel and drive pacman. The toolchain arrives as the
+		# package it is, so the installation is one pacman knows about and
+		# can move later.
+		install_from_packages=1
+		url="https://github.com/vitasdk/vdpm/releases/download/$SEED_RELEASE/vdpm-$SEED_VERSION-$host.tar.bz2"
 	fi
 
 	if [[ -z $expected_sha256 ]]; then
@@ -256,16 +271,21 @@ case $(uname -s) in
 	MSYS*|MINGW*|CYGWIN*)
 		required=(bin/vdpm.exe bin/arm-vita-eabi-gcc.exe usr/bin/pacman.exe \
 			usr/bin/msys-2.0.dll etc/pacman.conf version_info.txt)
+		seed_required=(bin/vdpm.exe usr/bin/pacman.exe usr/bin/vdpm-channel.exe \
+			share/vdpm/channel-public-key.pem)
 		vdpm_binary="$staging_directory/bin/vdpm.exe"
 		pacman_binary="$staging_directory/usr/bin/pacman.exe"
 		;;
 	*)
 		required=(bin/vdpm bin/arm-vita-eabi-gcc bin/pacman bin/vdpm-channel \
 			bin/include/refresh-repositories.sh etc/pacman.conf version_info.txt)
+		seed_required=(bin/vdpm bin/pacman bin/vdpm-channel \
+			bin/include/refresh-repositories.sh share/vdpm/channel-public-key.pem)
 		vdpm_binary="$staging_directory/bin/vdpm"
 		pacman_binary="$staging_directory/bin/pacman"
 		;;
 esac
+(( install_from_packages )) && required=("${seed_required[@]}")
 for relative_path in "${required[@]}"; do
 	[[ -f $staging_directory/$relative_path && ! -L $staging_directory/$relative_path ]] || {
 		printf 'VitaSDK bootstrap archive is missing %s\n' "$relative_path" >&2
@@ -274,6 +294,50 @@ for relative_path in "${required[@]}"; do
 done
 "$vdpm_binary" --help >/dev/null
 "$pacman_binary" --version >/dev/null
+
+if (( install_from_packages )); then
+	# The one thing this script decides on its own. Everything the seed goes
+	# on to verify hangs off this key, so a seed carrying another one is a
+	# seed that could accept another channel.
+	key="$staging_directory/share/vdpm/channel-public-key.pem"
+	if command -v sha256sum >/dev/null; then
+		key_digest=$(sha256sum "$key")
+	else
+		key_digest=$(shasum -a 256 "$key")
+	fi
+	[[ ${key_digest%% *} == "$CHANNEL_KEY_SHA256" ]] || {
+		printf 'the client seed carries an unexpected channel key\n' >&2
+		exit 1
+	}
+
+	# Selecting the series writes the verified databases, and installing the
+	# toolchain from them is what makes this an installation pacman knows
+	# about: it can be upgraded, moved to another series, and asked what it is.
+	VITASDK="$staging_directory" "$vdpm_binary" refresh "$channel"
+
+	# The seed put the client on disk before pacman existed to record it, so
+	# the package that owns those files takes them over here. Scoped to the
+	# seed, and only ever in this empty staging directory.
+	mkdir -p "$staging_directory/var/cache/pacman/pkg" "$staging_directory/var/log"
+	# A core that still ships a default pacman.conf would put it back over the
+	# one refresh just wrote, and with it the series this installation is on.
+	# The selection belongs to the installation, not to the package.
+	cp "$staging_directory/etc/pacman.conf" "$staging_directory/etc/pacman.conf.selected"
+	VDPM_NONINTERACTIVE=1 "$pacman_binary" \
+		--config "$staging_directory/etc/pacman.conf" \
+		--root "$staging_directory" \
+		--dbpath "$staging_directory/var/lib/pacman" \
+		--cachedir "$staging_directory/var/cache/pacman/pkg" \
+		--logfile "$staging_directory/var/log/pacman.log" \
+		--noconfirm --noscriptlet \
+		--sync vitasdk-core --overwrite '*/bin/vdpm*' \
+		--overwrite '*/bin/pacman*' --overwrite '*/bin/include/*' \
+		--overwrite '*/usr/bin/*' --overwrite '*/share/vdpm/*' \
+		--overwrite '*/etc/pacman.conf'
+	mv "$staging_directory/etc/pacman.conf.selected" \
+		"$staging_directory/etc/pacman.conf"
+	channel=
+fi
 
 installed_vdpm="$install_directory/${vdpm_binary#"$staging_directory"/}"
 
