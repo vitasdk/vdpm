@@ -21,8 +21,8 @@ EOF
 # databases and the packages are all verified with that key afterwards. A
 # manifest cannot be allowed to name its own verifier, so the chain starts
 # here and not on the network.
-SEED_RELEASE=v0.1.0
-SEED_VERSION=0.1.0
+SEED_RELEASE=v0.1.1
+SEED_VERSION=0.1.1
 CHANNEL_KEY_SHA256=c02df2e12216f6f633d94206634bbe8f244d74f610b29e922d7ea8bab2efb307
 
 install_from_packages=0
