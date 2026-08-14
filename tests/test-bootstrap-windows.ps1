@@ -77,21 +77,29 @@ $env:VITASDK = $installDirectory
 $status = & (Join-Path $installDirectory 'bin/vdpm.exe') status
 Check 'status answers' ($LASTEXITCODE -eq 0) $true
 
-# Which package owns the client decides what can be asked of it. A core built
-# before the split carries bin/vdpm.exe itself and installs it over the seed's,
-# so the SDK ends up running whatever client that core shipped -- older than
-# the one this job just built, and unable to answer for itself.
-$owner = & $pacman --config $configuration --root $installDirectory `
-    --dbpath $database --query --owns (Join-Path $installDirectory 'bin/vdpm.exe')
-$ownerPackage = if ($owner -match 'owned by (\S+)') { $Matches[1] } else { 'nobody' }
-Check 'the client belongs to a package' ($ownerPackage -ne 'nobody') $true
-if ($ownerPackage -eq 'vdpm') {
+# Which client the SDK ended up with decides what can be asked of it. A core
+# built before the split carries bin/vdpm.exe itself and installs it over the
+# seed's, so the SDK runs whatever client that core shipped rather than the one
+# this job just built.
+function Read-ClientVersion($lines) {
+    $found = $lines | Select-String -Pattern '^version=(.+)$' | Select-Object -First 1
+    $found.Matches[0].Groups[1].Value
+}
+# Named, not matched by a pattern: which of the two tars is on PATH decides
+# whether a wildcard selects anything.
+$seedEntry = (& tar.exe -tf $env:VITASDK_SEED_ARCHIVE) |
+    Where-Object { $_ -like '*/share/vdpm/release-info.txt' } | Select-Object -First 1
+$seedVersion = Read-ClientVersion (& tar.exe -xOf $env:VITASDK_SEED_ARCHIVE $seedEntry)
+$installedVersion = Read-ClientVersion (Get-Content `
+    (Join-Path $installDirectory 'share/vdpm/release-info.txt'))
+
+if ($installedVersion -eq $seedVersion) {
     Check 'and names the toolchain it has' `
         ([bool]($status | Select-String -Pattern '^Installed ')) $true
 } else {
-    Write-Host ("note: the published core still owns the client ($ownerPackage), " +
-        "so this SDK runs that core's vdpm and not the one under test. " +
-        "The split core has to be published before this can be checked.")
+    Write-Host ("note: the published core carries its own client ($installedVersion) " +
+        "and installed it over the seed's ($seedVersion), so this SDK is not running " +
+        "the client under test. A core built after the split leaves it alone.")
 }
 
 $status | ForEach-Object { Write-Host "    $_" }
@@ -113,9 +121,7 @@ if ($failures -ne 0) {
     # does not make. If pacman answers here and not there, the difference is
     # the shell, not the query.
     Write-Host "--- which client the SDK ended up with"
-    Write-Host "    $owner"
-    Get-Content (Join-Path $installDirectory 'share/vdpm/release-info.txt') `
-        -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "    $_" }
+    Write-Host "    seed $seedVersion, installed $installedVersion"
     Write-Host "--- the tail of pacman's log"
     Get-Content (Join-Path $installDirectory 'var/log/pacman.log') -Tail 6 `
         -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "    $_" }
