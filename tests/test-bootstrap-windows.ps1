@@ -94,6 +94,26 @@ if ($failures -ne 0) {
     Get-ChildItem -Recurse -Force -Filter 'arm-vita-eabi-gcc.exe' $env:RUNNER_TEMP `
         -ErrorAction SilentlyContinue |
         Select-Object -First 3 | ForEach-Object { Write-Host "    $($_.FullName)" }
+    # status asks pacman through cmd, which is the one call the test itself
+    # does not make. If pacman answers here and not there, the difference is
+    # the shell, not the query.
+    # status asks through cmd, and it spells its path arguments with forward
+    # slashes; the test asks directly, with backslashes. Both spellings, so a
+    # difference between them cannot hide.
+    foreach ($spelling in 'as status spells it', 'as the test spells it') {
+        $useSlashes = $spelling -eq 'as status spells it'
+        $arguments = @($configuration, $installDirectory, $database) | ForEach-Object {
+            if ($useSlashes) { $_ -replace '\\', '/' } else { $_ }
+        }
+        Write-Host "--- the same query, $spelling"
+        $line = "`"$pacman`" --config `"$($arguments[0])`" --root `"$($arguments[1])`"" +
+            " --dbpath `"$($arguments[2])`" --query vitasdk-core"
+        cmd.exe /c "`"$line`"" 2>&1 | ForEach-Object { Write-Host "    $_" }
+        Write-Host "    exit: $LASTEXITCODE"
+    }
+    Write-Host "--- status, keeping what it says on the error stream"
+    & (Join-Path $installDirectory 'bin/vdpm.exe') status 2>&1 |
+        ForEach-Object { Write-Host "    $_" }
     Write-Host "--- the tail of pacman's log"
     Get-Content (Join-Path $installDirectory 'var/log/pacman.log') -Tail 6 `
         -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "    $_" }
