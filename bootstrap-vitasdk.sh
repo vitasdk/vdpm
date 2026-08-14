@@ -16,11 +16,18 @@ supported series in the published index is installed and selected.
 EOF
 }
 
-# The root of trust is this script. It names the seed to fetch and the digest
-# of the channel key that seed must contain; the index, the manifest, the
-# databases and the packages are all verified with that key afterwards. A
-# manifest cannot be allowed to name its own verifier, so the chain starts
-# here and not on the network.
+# Where trust starts, stated plainly: this script names a release, and getting
+# the bytes of that release right is left to GitHub and to HTTPS. The seed is
+# code -- it carries the program that checks every signature afterwards -- so
+# pinning its digest here is the only thing that would make this script the
+# root instead of them. That is a deliberate choice and not an oversight.
+#
+# The key digest below is checked all the same. It cannot detect a tampered
+# client, but it does catch a seed that quietly brings a different channel
+# key, which is the mistake a mirror or a stale release can make on its own.
+#
+# What the network is never allowed to decide is which verifier to trust: the
+# manifest that says what to install is checked with the key already on disk.
 SEED_RELEASE=v0.1.1
 SEED_VERSION=0.1.1
 CHANNEL_KEY_SHA256=c02df2e12216f6f633d94206634bbe8f244d74f610b29e922d7ea8bab2efb307

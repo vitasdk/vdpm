@@ -16,9 +16,12 @@ if (Test-Path $InstallDirectory) {
     throw "VitaSDK install directory already exists: ${InstallDirectory}"
 }
 
-# The root of trust is this script. It names the seed to fetch and the digest
-# of the channel key that seed must contain; the index, the manifest, the
-# databases and the packages are all verified with that key afterwards.
+# Where trust starts, stated plainly: this script names a release, and getting
+# the bytes of that release right is left to GitHub and to HTTPS. The seed is
+# code, so pinning its digest here is the only thing that would make this
+# script the root instead of them; that is a deliberate choice. The key digest
+# below is checked anyway, because it catches a seed that brings a different
+# channel key.
 $SeedRelease = 'v0.1.1'
 $SeedVersion = '0.1.1'
 $ChannelKeySha256 = 'c02df2e12216f6f633d94206634bbe8f244d74f610b29e922d7ea8bab2efb307'

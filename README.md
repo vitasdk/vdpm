@@ -70,12 +70,26 @@ and installed into every SDK. Refresh fails closed: a manifest whose signature
 does not verify against it is not parsed, and nothing is written to pacman's
 sync directory.
 
+Where that key comes from in the first place is worth being exact about. The
+bootstrap fetches a client seed from a release it names, over HTTPS, and
+checks that the channel key inside it is the expected one. That check catches
+a seed carrying the wrong key; it cannot catch a tampered client, because the
+seed is the program that does every later check. **Delivering that release
+intact is trusted to GitHub and to HTTPS**, which is a deliberate choice: the
+alternative is to pin the digest of every host bundle in the script, and cut
+every release in two passes so those digests exist before the tag does.
+
+From the seed onwards nothing is taken on trust: the manifest is verified with
+the key already on disk, the databases are accepted only if they hash to what
+that manifest says, and pacman checks the packages against those databases.
+
 ## Bootstrap
 
-The bootstrap installs a release without being told which one. It reads the
-signed channel index, takes the newest series marked `supported`, downloads
-that release's `vitasdk-bootstrap-<host>` archive, verifies its SHA-256 against
-the published sidecar, extracts it, and selects the channel:
+The bootstrap installs a release without being told which one, and installs it
+as packages rather than as a tree. It takes the newest series marked
+`supported` from the channel index, fetches the client seed, checks the channel
+key it carries, selects the series -- which writes the databases the signed
+manifest names -- and lets pacman install `vitasdk-core` from them:
 
 ```sh
 git clone https://github.com/vitasdk/vdpm
@@ -96,11 +110,16 @@ and then no series is selected because none was asked for:
 ```
 
 PowerShell uses the equivalent `bootstrap-vitasdk.ps1`. Both implementations
-download into a temporary sibling directory, verify the digest, reject unsafe
-archive paths, extract and validate the package manager and compiler, and only
-then move the complete SDK into place. A failed bootstrap leaves no partial
-installation at the requested destination, and an existing destination is
-refused rather than written over.
+work in a temporary sibling directory, verify what they download, reject unsafe
+archive paths, and only then move the finished SDK into place. A failed
+bootstrap leaves no partial installation at the requested destination, and an
+existing destination is refused rather than written over.
+
+Installing rather than unpacking is what makes the result something pacman
+knows about: `vdpm upgrade` can update the toolchain, `vdpm refresh` can move
+it to another series, and `vdpm status` can say which one is actually there.
+An unpacked tree answers none of those, because nothing recorded that it was
+ever installed.
 
 This is intentionally a clean-install boundary: the old `packages.list`
 database cannot describe file ownership to pacman, so an existing legacy SDK is
