@@ -30,7 +30,7 @@ if (-not $publicKey) {
 
 $base = $env:VITASDK_CHANNEL_BASE_URL
 if (-not $base) {
-    $base = "https://vitasdk.github.io/channels"
+    $base = "https://vitasdk.org/channels"
 }
 
 $temporary = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid().ToString())

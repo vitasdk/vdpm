@@ -17,7 +17,7 @@ set -euo pipefail
 
 channel_tool="$VITASDK/bin/vdpm-channel"
 public_key="$VITASDK/share/vdpm/channel-public-key.pem"
-base=${VITASDK_CHANNEL_BASE_URL:-https://vitasdk.github.io/channels}
+base=${VITASDK_CHANNEL_BASE_URL:-https://vitasdk.org/channels}
 
 [[ -x $channel_tool ]] || {
 	printf 'missing %s\n' "$channel_tool" >&2

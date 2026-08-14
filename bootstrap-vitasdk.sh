@@ -117,7 +117,7 @@ if [[ -z $local_archive && ( -z $url || -z $expected_sha256 ) ]]; then
 	}
 	printf 'Detecting VitaSDK bootstrap archive for %s...\n' "$host" >&2
 
-	manifest_base=${VITASDK_CHANNEL_BASE_URL:-https://vitasdk.github.io/channels}
+	manifest_base=${VITASDK_CHANNEL_BASE_URL:-https://vitasdk.org/channels}
 
 	# Nothing requested, or the `stable` alias: the index says which series is
 	# supported today. `stable` is not a channel and never was one -- there is

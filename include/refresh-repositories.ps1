@@ -100,7 +100,7 @@ try {
     else {
         $baseUrl = $env:VITASDK_CHANNEL_BASE_URL
         if ([string]::IsNullOrWhiteSpace($baseUrl)) {
-            $baseUrl = "https://vitasdk.github.io/channels"
+            $baseUrl = "https://vitasdk.org/channels"
         }
         $baseUrl = $baseUrl.TrimEnd('/')
         Download-File "${baseUrl}/${Channel}.json" $manifest

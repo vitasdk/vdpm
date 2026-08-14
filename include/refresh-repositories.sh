@@ -59,7 +59,7 @@ if [[ -n ${VITASDK_CHANNEL_MANIFEST:-} ]]; then
 	cp "$VITASDK_CHANNEL_MANIFEST" "$manifest"
 	cp "${VITASDK_CHANNEL_MANIFEST}.sig" "$signature"
 else
-	base=${VITASDK_CHANNEL_BASE_URL:-https://vitasdk.github.io/channels}
+	base=${VITASDK_CHANNEL_BASE_URL:-https://vitasdk.org/channels}
 	download "$base/$channel.json" "$manifest"
 	download "$base/$channel.json.sig" "$signature"
 fi

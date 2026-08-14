@@ -24,7 +24,7 @@ if (-not $ArchivePath -and (-not $Url -or -not $Sha256)) {
     $hostArchitecture = "x86_64-w64-mingw32"
     Write-Host "Detecting VitaSDK bootstrap archive for $hostArchitecture..."
     
-    $manifestBase = if ($env:VITASDK_CHANNEL_BASE_URL) { $env:VITASDK_CHANNEL_BASE_URL } else { "https://vitasdk.github.io/channels" }
+    $manifestBase = if ($env:VITASDK_CHANNEL_BASE_URL) { $env:VITASDK_CHANNEL_BASE_URL } else { "https://vitasdk.org/channels" }
 
     # Nothing requested, or the `stable` alias: the index says which series is
     # supported today. `stable` is not a channel and never was one -- there is
