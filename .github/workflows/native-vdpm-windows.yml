@@ -7,6 +7,9 @@ on:
       - src/CMakeLists.txt
       - src/vdpm.c
       - tests/test-vdpm-windows.ps1
+      - tests/test-bootstrap-windows.ps1
+      - bootstrap-vitasdk.ps1
+      - include/refresh-repositories.ps1
       - .github/workflows/native-vdpm-windows.yml
   push:
     branches:
@@ -17,6 +20,9 @@ on:
       - src/CMakeLists.txt
       - src/vdpm.c
       - tests/test-vdpm-windows.ps1
+      - tests/test-bootstrap-windows.ps1
+      - bootstrap-vitasdk.ps1
+      - include/refresh-repositories.ps1
       - .github/workflows/native-vdpm-windows.yml
   workflow_dispatch:
 
@@ -29,3 +35,9 @@ jobs:
       - name: Exercise native vdpm over minimal MSYS pacman
         shell: pwsh
         run: ./tests/test-vdpm-windows.ps1
+
+      # Against the published channels, so this also checks that the seed the
+      # script names exists and carries the key it is supposed to.
+      - name: Install a real SDK the way a Windows user would
+        shell: pwsh
+        run: ./tests/test-bootstrap-windows.ps1
