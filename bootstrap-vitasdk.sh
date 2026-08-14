@@ -33,6 +33,8 @@ SEED_VERSION=0.1.1
 CHANNEL_KEY_SHA256=c02df2e12216f6f633d94206634bbe8f244d74f610b29e922d7ea8bab2efb307
 
 install_from_packages=0
+resolve_series=0
+manifest_base=${VITASDK_CHANNEL_BASE_URL:-https://vitasdk.org/channels}
 install_directory=${VITASDK:-/usr/local/vitasdk}
 url=${VITASDK_BOOTSTRAP_URL:-}
 expected_sha256=${VITASDK_BOOTSTRAP_SHA256:-}
@@ -116,51 +118,19 @@ if [[ -n $local_archive && -z $expected_sha256 && -f "${local_archive}.sha256" ]
 	expected_sha256=$(awk '{print $1}' "${local_archive}.sha256")
 fi
 
-# Auto-resolve URL and SHA256 if neither local archive nor explicit parameters were passed
+# Nothing is resolved from the network yet: the seed is the same whichever
+# series is chosen, and choosing one before there is anything to verify the
+# index with is how somebody asking for the supported release ends up
+# somewhere else that is also legitimately signed.
 if [[ -z $local_archive && ( -z $url || -z $expected_sha256 ) ]]; then
+	# Naming an exact archive is asking for that archive and nothing else, so
+	# no series is selected in that case: none was requested.
+	resolve_series=1
 	host=$(detect_host_triplet) || {
 		printf 'Unsupported host platform for automatic VitaSDK bootstrap\n' >&2
 		exit 1
 	}
-	printf 'Detecting VitaSDK bootstrap archive for %s...\n' "$host" >&2
 
-	manifest_base=${VITASDK_CHANNEL_BASE_URL:-https://vitasdk.org/channels}
-
-	# Nothing requested, or the `stable` alias: the index says which series is
-	# supported today. `stable` is not a channel and never was one -- there is
-	# no stable.json to fetch -- so it is resolved here and never stored, the
-	# way `latest` names a Docker image without being one.
-	if [[ -z $channel || $channel == stable ]]; then
-		index_content=$(download_to_string "$manifest_base/index.json") || {
-			printf 'Could not read the release index at %s/index.json\n' "$manifest_base" >&2
-			exit 1
-		}
-		# Series are named YYYY.MM, so the newest one is the highest year and
-		# then the highest month.
-		channel=$(printf '%s' "$index_content" |
-			grep -o '"[^"]*":{"status":"supported"' | cut -d'"' -f2 |
-			sort -t. -k1,1nr -k2,2nr | head -n1)
-		[[ -n $channel ]] || {
-			printf 'The release index at %s lists no supported series\n' "$manifest_base" >&2
-			exit 1
-		}
-		printf 'Installing the supported series %s\n' "$channel" >&2
-	fi
-
-	# No fallback to anything else. Installing a series nobody asked for -- as
-	# resolving `stable` to the nightly used to do -- hands somebody the
-	# development channel while they believe they asked for the stable one.
-	manifest_url="$manifest_base/$channel.json"
-	manifest_content=$(download_to_string "$manifest_url") || {
-		printf 'Could not read the %s manifest at %s\n' "$channel" "$manifest_url" >&2
-		exit 1
-	}
-
-	release_tag=$(printf '%s' "$manifest_content" | grep -o '"release":"[^"]*"' | head -n1 | cut -d'"' -f4)
-	[[ -n $release_tag ]] || {
-		printf 'The %s manifest names no core release\n' "$channel" >&2
-		exit 1
-	}
 	if [[ -z $url ]]; then
 		# The seed is the client and nothing else: eight megabytes that can
 		# verify a channel and drive pacman. The toolchain arrives as the
@@ -174,17 +144,6 @@ if [[ -z $local_archive && ( -z $url || -z $expected_sha256 ) ]]; then
 		sidecar_content=$(download_to_string "${url}.sha256" || true)
 		if [[ -n $sidecar_content ]]; then
 			expected_sha256=$(printf '%s' "$sidecar_content" | awk '{print $1}')
-		fi
-	fi
-
-	# Grouped releases carry a single SHA256SUMS covering every asset, so the
-	# digest stays available when an archive ships without its own sidecar.
-	if [[ -z $expected_sha256 ]]; then
-		sums_content=$(download_to_string "${url%/*}/SHA256SUMS" || true)
-		if [[ -n $sums_content ]]; then
-			expected_sha256=$(printf '%s' "$sums_content" |
-				awk -v archive="${url##*/}" \
-					'{ sub(/^\*/, "", $2) } $2 == archive { print $1; exit }')
 		fi
 	fi
 fi
@@ -203,6 +162,14 @@ elif [[ -z $url ]]; then
 	printf 'VITASDK_BOOTSTRAP_URL must select an immutable SDK archive\n' >&2
 	exit 1
 fi
+
+download_to_file() {
+	if command -v curl >/dev/null; then
+		curl --fail --location --silent --show-error --output "$2" "$1"
+	else
+		wget --quiet --output-document="$2" "$1"
+	fi
+}
 
 install_parent=$(dirname "$install_directory")
 mkdir -p "$install_parent"
@@ -281,6 +248,7 @@ case $(uname -s) in
 		seed_required=(bin/vdpm.exe usr/bin/pacman.exe usr/bin/vdpm-channel.exe \
 			share/vdpm/channel-public-key.pem)
 		vdpm_binary="$staging_directory/bin/vdpm.exe"
+		channel_tool=usr/bin/vdpm-channel.exe
 		pacman_binary="$staging_directory/usr/bin/pacman.exe"
 		;;
 	*)
@@ -289,6 +257,7 @@ case $(uname -s) in
 		seed_required=(bin/vdpm bin/pacman bin/vdpm-channel \
 			bin/include/refresh-repositories.sh share/vdpm/channel-public-key.pem)
 		vdpm_binary="$staging_directory/bin/vdpm"
+		channel_tool=bin/vdpm-channel
 		pacman_binary="$staging_directory/bin/pacman"
 		;;
 esac
@@ -301,6 +270,30 @@ for relative_path in "${required[@]}"; do
 done
 "$vdpm_binary" --help >/dev/null
 "$pacman_binary" --version >/dev/null
+
+# Now, and not before, the index can be read: the seed carries the tool
+# that checks its signature. Reading it earlier meant the answer to "which
+# series is supported" arrived unverified, and that answer decides what
+# gets installed.
+if (( resolve_series )) && [[ -z $channel || $channel == stable ]]; then
+	index="$temporary_directory/index.json"
+	download_to_file "$manifest_base/index.json" "$index"
+	download_to_file "$manifest_base/index.json.sig" "$index.sig"
+	"$staging_directory/$channel_tool" verify "$index" "$index.sig" \
+		"$staging_directory/share/vdpm/channel-public-key.pem" || {
+		printf 'the release index is not signed by the expected key\n' >&2
+		exit 1
+	}
+	# Series are named YYYY.MM, so the newest one is the highest year and
+	# then the highest month.
+	channel=$(grep -o '"[^"]*":{"status":"supported"' "$index" | cut -d'"' -f2 |
+		sort -t. -k1,1nr -k2,2nr | head -n1)
+	[[ -n $channel ]] || {
+		printf 'the release index lists no supported series\n' >&2
+		exit 1
+	}
+	printf 'Installing the supported series %s\n' "$channel" >&2
+fi
 
 if (( install_from_packages )); then
 	# The one thing this script decides on its own. Everything the seed goes

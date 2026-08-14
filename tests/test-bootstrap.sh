@@ -80,6 +80,7 @@ mkdir -p "$channels"
 cat > "$channels/index.json" <<'EOF'
 {"channels":{"2025.03":{"status":"end-of-life"},"2026.08":{"status":"supported"},"2026.09":{"status":"supported"},"nightly":{"status":"development"}},"schema_version":1}
 EOF
+printf 'signature\n' > "$channels/index.json.sig"
 printf '{"channel":"2026.09","core":{"release":"sdk-core-2026.09.0"}}' \
 	> "$channels/2026.09.json"
 
@@ -114,6 +115,7 @@ empty_channels="$temporary_directory/empty-channels"
 mkdir -p "$empty_channels"
 printf '{"channels":{"nightly":{"status":"development"}},"schema_version":1}' \
 	> "$empty_channels/index.json"
+printf 'signature\n' > "$empty_channels/index.json.sig"
 if VITASDK_BOOTSTRAP_URL="file://$archive" \
 	VITASDK_CHANNEL_BASE_URL="file://$empty_channels" \
 	"$repository_root/bootstrap-vitasdk.sh" \
