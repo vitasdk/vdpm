@@ -601,17 +601,22 @@ static void print_installed_core(const char *root)
 	char *pacman = join_path(root, "bin/pacman");
 #endif
 	char *database = join_path(root, "var/lib/pacman");
+	const char *config_environment = getenv("VDPM_PACMAN_CONF");
+	char *configuration = config_environment && config_environment[0]
+		? duplicate_string(config_environment)
+		: join_path(root, "etc/pacman.conf");
 	char command[2048];
 	char line[512];
 	FILE *pipe;
 	int found = 0;
 
-	if (!pacman || !database)
+	if (!pacman || !database || !configuration)
 		goto out;
 	to_native_separators(pacman);
 	snprintf(command, sizeof(command),
-		 COMMAND_OPEN "\"%s\" --root \"%s\" --dbpath \"%s\" --query vitasdk-core"
-		 COMMAND_CLOSE, pacman, root, database);
+		 COMMAND_OPEN "\"%s\" --config \"%s\" --root \"%s\" --dbpath \"%s\""
+		 " --query vitasdk-core" COMMAND_CLOSE,
+		 pacman, configuration, root, database);
 	pipe = popen(command, "r");
 	if (!pipe)
 		goto out;
@@ -632,6 +637,7 @@ static void print_installed_core(const char *root)
 		printf("Installed no registered toolchain: this prefix was unpacked "
 		       "rather than installed, so upgrades cannot reach it\n");
 out:
+	free(configuration);
 	free(database);
 	free(pacman);
 }
@@ -973,8 +979,11 @@ int main(int argc, char **argv)
 	append_argument(arguments, &argument_count, cache);
 	append_argument(arguments, &argument_count, "--logfile");
 	append_argument(arguments, &argument_count, log);
+	/* Refresh belongs here too: moving between series is a transaction like
+	 * any other, and one that stops to ask a question nobody is there to
+	 * answer is one that leaves the series half changed. */
 	if (command == COMMAND_INSTALL || command == COMMAND_REMOVE ||
-			command == COMMAND_UPGRADE) {
+			command == COMMAND_UPGRADE || command == COMMAND_REFRESH) {
 		append_argument(arguments, &argument_count, "--noscriptlet");
 		if (getenv("VDPM_NONINTERACTIVE") &&
 				strcmp(getenv("VDPM_NONINTERACTIVE"), "1") == 0) {
