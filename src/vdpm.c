@@ -34,6 +34,7 @@
 #else
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #define mkdir_one(path) mkdir((path), 0777)
 #define DISCARD_ERRORS "2>/dev/null"
@@ -319,6 +320,38 @@ static int run_process(const char *path, char *const arguments[])
 #endif
 }
 
+/*
+ * Runs a program and comes back, which run_process cannot do: it hands the
+ * process over so that pacman's exit status and signals are vdpm's own. A
+ * refresh has work left to do afterwards -- the transaction that moves the
+ * toolchain, and the selection that follows it -- so those steps wait here.
+ */
+static int spawn_and_wait(const char *path, char *const arguments[])
+{
+#ifdef _WIN32
+	return run_process(path, arguments);
+#else
+	pid_t child;
+	int wait_status;
+
+	fflush(NULL);
+	child = fork();
+	if (child < 0)
+		return fail_path("could not start", path);
+	if (child == 0) {
+		execv(path, arguments);
+		fprintf(stderr, "%s: could not start %s: %s\n",
+			program_name, path, strerror(errno));
+		_exit(127);
+	}
+	if (waitpid(child, &wait_status, 0) < 0)
+		return fail_path("lost track of", path);
+	if (WIFEXITED(wait_status))
+		return WEXITSTATUS(wait_status);
+	return 1;
+#endif
+}
+
 #ifdef _WIN32
 static int run_windows_script(const char *root, const char *relative,
 			      const char *argument)
@@ -385,6 +418,24 @@ static int run_windows_script(const char *root, const char *relative,
  * Nothing here can stop an operation: if the banner cannot be produced, the
  * command runs anyway.
  */
+/*
+ * Selecting a series is renaming what refresh staged. Doing it after the
+ * transaction is what keeps an interrupted move from leaving an installation
+ * that claims one series while carrying another one's toolchain.
+ */
+static int commit_staged_channel(const char *root)
+{
+	char *staged = join_path(root, "var/lib/vdpm/channel.json.staged");
+	char *selected = join_path(root, "var/lib/vdpm/channel.json");
+	int status = 0;
+
+	if (rename(staged, selected) != 0)
+		status = fail_path("could not select the refreshed series", staged);
+	free(staged);
+	free(selected);
+	return status;
+}
+
 static void print_release_banner(const char *root)
 {
 	char *tool = join_path(root, CHANNEL_TOOL);
@@ -535,6 +586,56 @@ static int refuse_self_replacement(char **base, int base_count)
 }
 #endif
 
+/*
+ * What the toolchain in this prefix actually is, asked of pacman rather than
+ * read from the manifest. The manifest says what the selected series serves,
+ * which is a different question: an installation that never registered its
+ * core, or one whose move was interrupted, answers them differently, and the
+ * one worth printing is this one.
+ */
+static void print_installed_core(const char *root)
+{
+#ifdef _WIN32
+	char *pacman = join_path(root, "usr/bin/pacman.exe");
+#else
+	char *pacman = join_path(root, "bin/pacman");
+#endif
+	char *database = join_path(root, "var/lib/pacman");
+	char command[2048];
+	char line[512];
+	FILE *pipe;
+	int found = 0;
+
+	if (!pacman || !database)
+		goto out;
+	to_native_separators(pacman);
+	snprintf(command, sizeof(command),
+		 COMMAND_OPEN "\"%s\" --root \"%s\" --dbpath \"%s\" --query vitasdk-core"
+		 COMMAND_CLOSE, pacman, root, database);
+	pipe = popen(command, "r");
+	if (!pipe)
+		goto out;
+	while (fgets(line, sizeof(line), pipe)) {
+		char *space = strchr(line, ' ');
+		char *newline;
+
+		if (!space)
+			continue;
+		newline = strchr(space + 1, '\n');
+		if (newline)
+			*newline = '\0';
+		printf("Installed %s\n", space + 1);
+		found = 1;
+	}
+	pclose(pipe);
+	if (!found)
+		printf("Installed no registered toolchain: this prefix was unpacked "
+		       "rather than installed, so upgrades cannot reach it\n");
+out:
+	free(database);
+	free(pacman);
+}
+
 static int print_status(const char *root)
 {
 	/* Native rather than a shell script: this has to answer "which VitaSDK
@@ -593,6 +694,8 @@ static int print_status(const char *root)
 	}
 	pclose(pipe);
 	status = channel[0] ? 0 : 1;
+	if (status == 0)
+		print_installed_core(root);
 
 	if (status == 0 && access(index, 0) == 0) {
 		snprintf(command, sizeof(command), "\"%s\" series \"%s\"", tool, index);
@@ -794,8 +897,10 @@ int main(int argc, char **argv)
 #ifdef _WIN32
 		status = run_windows_script(root, "share/vdpm/refresh-repositories.ps1",
 			argv[input]);
-		free(root);
-		return status;
+		if (status != 0) {
+			free(root);
+			return status;
+		}
 #else
 		{
 			char *refresh = join_path(root,
@@ -812,12 +917,17 @@ int main(int argc, char **argv)
 			refresh_arguments[0] = refresh;
 			refresh_arguments[1] = argv[input];
 			refresh_arguments[2] = NULL;
-			status = run_process(refresh, refresh_arguments);
+			status = spawn_and_wait(refresh, refresh_arguments);
 			free(refresh);
-			free(root);
-			return status;
+			if (status != 0) {
+				free(root);
+				return status;
+			}
 		}
 #endif
+		/* The repositories now describe the requested series, and the
+		 * transaction below is what actually moves the installation onto
+		 * it. Only when that succeeds is the series selected. */
 	}
 
 	pacman_environment = getenv("VDPM_PACMAN");
@@ -919,6 +1029,16 @@ int main(int argc, char **argv)
 			return fail("pacman requires at least one argument");
 		break;
 	case COMMAND_REFRESH:
+		/* No --refresh: the databases in the sync directory are the ones
+		 * whose hashes the signed manifest just named, and asking pacman
+		 * to fetch them again would replace them with unverified copies.
+		 * Twice --sysupgrade because moving to another series is not an
+		 * upgrade: its toolchain is often older than the one installed. */
+		append_argument(arguments, &argument_count, "--sync");
+		append_argument(arguments, &argument_count, "--sysupgrade");
+		append_argument(arguments, &argument_count, "--sysupgrade");
+		input = argc;
+		break;
 	case COMMAND_CHANNELS:
 	case COMMAND_STATUS:
 		/* Handled immediately after validating the SDK root. */
@@ -954,7 +1074,13 @@ int main(int argc, char **argv)
 		return 1;
 	}
 #endif
-	status = run_process(pacman, arguments);
+	if (command == COMMAND_REFRESH) {
+		status = spawn_and_wait(pacman, arguments);
+		if (status == 0)
+			status = commit_staged_channel(root);
+	} else {
+		status = run_process(pacman, arguments);
+	}
 	free(arguments);
 	free(log);
 	free(log_directory);

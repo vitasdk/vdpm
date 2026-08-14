@@ -151,7 +151,10 @@ try {
     }
     Install-File $coreDatabase (Join-Path $syncRoot "${hostTriplet}.db")
     Install-File $vitaDatabase (Join-Path $syncRoot "vita.db")
-    Install-File $manifest (Join-Path $stateRoot "channel.json")
+    # Staged, not selected: the transaction that moves the toolchain runs
+    # after this, and until it succeeds the installation is still on the
+    # series whose compiler it actually has.
+    Install-File $manifest (Join-Path $stateRoot "channel.json.staged")
     Install-File $configuration (Join-Path $configurationRoot "pacman.conf")
     Write-Host "refreshed $Channel channel sequence $(Manifest-Field 'sequence')"
 }

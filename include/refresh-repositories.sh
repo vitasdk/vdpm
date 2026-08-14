@@ -116,6 +116,11 @@ Server = $(value packages.server)
 EOF
 cp "$core_database" "$VITASDK/var/lib/pacman/sync/$host.db"
 cp "$vita_database" "$VITASDK/var/lib/pacman/sync/vita.db"
-cp "$manifest" "$VITASDK/var/lib/vdpm/channel.json"
 mv "$configuration" "$VITASDK/etc/pacman.conf"
+
+# The selection is staged, not made. Moving between series is a package
+# transaction, and until that transaction succeeds this installation is still
+# on the series whose toolchain it actually has: whoever runs this commits the
+# staged manifest afterwards.
+cp "$manifest" "$VITASDK/var/lib/vdpm/channel.json.staged"
 printf 'refreshed %s channel sequence %s\n' "$channel" "$(value sequence)"

@@ -23,6 +23,10 @@ chmod +x "$sdk_root/bin/pacman"
 cat > "$sdk_root/bin/include/refresh-repositories.sh" <<'EOF'
 #!/usr/bin/env bash
 printf 'refresh %s\n' "$1" >> "$VDPM_TEST_LOG"
+# Refresh stages the selection; the client commits it once the transaction
+# that moves the toolchain has succeeded.
+mkdir -p "$VITASDK/var/lib/vdpm"
+printf '{"channel":"%s"}\n' "$1" > "$VITASDK/var/lib/vdpm/channel.json.staged"
 EOF
 chmod +x "$sdk_root/bin/include/refresh-repositories.sh"
 printf '[options]\nArchitecture = test vita\n' > "$sdk_root/etc/pacman.conf"

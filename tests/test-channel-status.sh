@@ -94,5 +94,20 @@ if ! VITASDK="$root" "$build/vdpm" install zlib >/dev/null 2>&1; then
 	failures=$((failures + 1))
 fi
 
+# What the channel serves and what this prefix has are different questions,
+# and the second one is the one that used to go unanswered: an installation
+# whose move was interrupted, or that was unpacked rather than installed,
+# named a toolchain it did not carry.
+manifest 2026.09
+printf '#!/bin/sh\necho "vitasdk-core 2026.08.0-1"\n' > "$root/bin/pacman"
+chmod +x "$root/bin/pacman"
+output=$(VITASDK="$root" "$build/vdpm" status 2>&1)
+check "installed core" "$output" "Installed 2026.08.0-1"
+
+printf '#!/bin/sh\nexit 1\n' > "$root/bin/pacman"
+chmod +x "$root/bin/pacman"
+output=$(VITASDK="$root" "$build/vdpm" status 2>&1)
+check "unmanaged prefix" "$output" "no registered toolchain"
+
 [[ $failures -eq 0 ]] || exit 1
 echo "release banner and status OK"
