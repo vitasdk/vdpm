@@ -77,5 +77,22 @@ Check 'and names the toolchain it has' `
 
 $status | ForEach-Object { Write-Host "    $_" }
 
-if ($failures -ne 0) { exit 1 }
+if ($failures -ne 0) {
+    # Where the files went is the question a failure here raises, and it is
+    # not one worth another ten-minute round trip to answer.
+    Write-Host "`n--- what is in the installation"
+    Get-ChildItem $installDirectory | ForEach-Object { Write-Host "    $($_.Name)" }
+    Write-Host "--- what pacman says it installed"
+    & $pacman --config $configuration --root $installDirectory --dbpath $database `
+        --query --list vitasdk-core 2>&1 |
+        Select-Object -First 6 | ForEach-Object { Write-Host "    $_" }
+    Write-Host "--- where the compiler actually is"
+    Get-ChildItem -Recurse -Force -Filter 'arm-vita-eabi-gcc.exe' $env:RUNNER_TEMP `
+        -ErrorAction SilentlyContinue |
+        Select-Object -First 3 | ForEach-Object { Write-Host "    $($_.FullName)" }
+    Write-Host "--- the tail of pacman's log"
+    Get-Content (Join-Path $installDirectory 'var/log/pacman.log') -Tail 6 `
+        -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "    $_" }
+    exit 1
+}
 Write-Host 'the Windows bootstrap installs a managed SDK'
