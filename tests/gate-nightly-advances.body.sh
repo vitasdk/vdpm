@@ -44,8 +44,8 @@ installed_core() {
 echo "=== onto the first nightly ==="
 VITASDK_CHANNEL_BASE_URL=file:///channels/a vdpm refresh nightly 2>&1 | tail -2
 first=$(installed_core)
-check "the toolchain became the nightly one" \
-	"$([ "$first" != "2026.08.0-1" ] && echo moved || echo "stayed at $first")" moved
+check "the toolchain became the one the first manifest names" \
+	"$first" "$(cat /channels/a/core-version)"
 
 use_client_under_test
 echo "=== upgrade does not go and find the next one ==="
@@ -58,7 +58,7 @@ VITASDK_CHANNEL_BASE_URL=file:///channels/b vdpm refresh nightly 2>&1 | tail -2
 second=$(installed_core)
 check "the toolchain advanced" \
 	"$([ "$second" != "$first" ] && echo advanced || echo "stayed at $first")" advanced
-check "and it is the one the manifest named" "$second" "0.582.1-1"
+check "and it is the one the manifest named" "$second" "$(cat /channels/b/core-version)"
 
 use_client_under_test
 echo "=== what it says is what it has ==="
