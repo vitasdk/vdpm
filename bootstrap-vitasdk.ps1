@@ -133,6 +133,7 @@ try {
             "usr/bin/pacman.exe",
             "usr/bin/vdpm-channel.exe",
             "usr/bin/msys-2.0.dll",
+            "usr/ssl/certs/ca-bundle.crt",
             "share/vdpm/channel-public-key.pem"
         )
     } else {

@@ -124,6 +124,7 @@ jobs:
             libsqlite-devel
             libunistring-devel
             openssl-devel
+            ca-certificates
       - name: Build patched Pacman runtime
         shell: msys2 {0}
         run: >-
@@ -150,6 +151,11 @@ jobs:
           cp "$pacman_stage/vdpm-channel.exe" "$stage/usr/bin/"
           cp "$pacman_stage/msys-2.0.dll" "$stage/usr/bin/"
           cp -R "$pacman_stage/licenses/." "$stage/share/vdpm/licenses/"
+          # Without these, pacman on Windows cannot open an HTTPS connection,
+          # so it can verify a channel and then fail to download a single
+          # package from it. The path is where the MSYS runtime looks.
+          mkdir -p "$stage/usr/ssl/certs"
+          cp /usr/ssl/certs/ca-bundle.crt "$stage/usr/ssl/certs/"
           revision=$(git rev-parse HEAD)
           scripts/create-release-bundle.sh \
             "$stage" "$PWD/release" x86_64-w64-mingw32 \

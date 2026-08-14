@@ -56,6 +56,8 @@ case $host in
 		test -s "$root/usr/bin/pacman.exe"
 		test -s "$root/usr/bin/vdpm-channel.exe"
 		test -s "$root/usr/bin/msys-2.0.dll"
+		# A client that cannot reach a repository is not a client.
+		test -s "$root/usr/ssl/certs/ca-bundle.crt"
 		test -s "$root/share/vdpm/refresh-repositories.ps1"
 		if [[ ${VDPM_VALIDATE_PE_IMPORTS:-0} == 1 ]]; then
 			command -v objdump >/dev/null
