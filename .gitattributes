@@ -1,2 +1,7 @@
 *.patch text eol=lf -whitespace
 *.sh text eol=lf
+
+# A public key is bytes, not text. Checked out with CRLF it is still the same
+# key and no longer the same file, and anything that pins its digest -- the
+# bootstrap does -- then rejects the Windows bundle for carrying it.
+*.pem binary
