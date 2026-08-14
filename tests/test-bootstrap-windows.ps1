@@ -77,30 +77,13 @@ $env:VITASDK = $installDirectory
 $status = & (Join-Path $installDirectory 'bin/vdpm.exe') status
 Check 'status answers' ($LASTEXITCODE -eq 0) $true
 
-# Which client the SDK ended up with decides what can be asked of it. A core
-# built before the split carries bin/vdpm.exe itself and installs it over the
-# seed's, so the SDK runs whatever client that core shipped rather than the one
-# this job just built.
-function Read-ClientVersion($lines) {
-    $found = $lines | Select-String -Pattern '^version=(.+)$' | Select-Object -First 1
-    $found.Matches[0].Groups[1].Value
-}
-# Named, not matched by a pattern: which of the two tars is on PATH decides
-# whether a wildcard selects anything.
-$seedEntry = (& tar.exe -tf $env:VITASDK_SEED_ARCHIVE) |
-    Where-Object { $_ -like '*/share/vdpm/release-info.txt' } | Select-Object -First 1
-$seedVersion = Read-ClientVersion (& tar.exe -xOf $env:VITASDK_SEED_ARCHIVE $seedEntry)
-$installedVersion = Read-ClientVersion (Get-Content `
-    (Join-Path $installDirectory 'share/vdpm/release-info.txt'))
-
-if ($installedVersion -eq $seedVersion) {
-    Check 'and names the toolchain it has' `
-        ([bool]($status | Select-String -Pattern '^Installed ')) $true
-} else {
-    Write-Host ("note: the published core carries its own client ($installedVersion) " +
-        "and installed it over the seed's ($seedVersion), so this SDK is not running " +
-        "the client under test. A core built after the split leaves it alone.")
-}
+# The core the series serves no longer carries a client of its own, so the
+# client on disk is always the one the vdpm package installed and status can
+# be asked for everything it knows. While the published core still carried
+# one, it installed that older client over the seed's and this could not be
+# asked at all.
+Check 'and names the toolchain it has' `
+    ([bool]($status | Select-String -Pattern '^Installed ')) $true
 
 $status | ForEach-Object { Write-Host "    $_" }
 
@@ -117,11 +100,9 @@ if ($failures -ne 0) {
     Get-ChildItem -Recurse -Force -Filter 'arm-vita-eabi-gcc.exe' $env:RUNNER_TEMP `
         -ErrorAction SilentlyContinue |
         Select-Object -First 3 | ForEach-Object { Write-Host "    $($_.FullName)" }
-    # status asks pacman through cmd, which is the one call the test itself
-    # does not make. If pacman answers here and not there, the difference is
-    # the shell, not the query.
     Write-Host "--- which client the SDK ended up with"
-    Write-Host "    seed $seedVersion, installed $installedVersion"
+    Get-Content (Join-Path $installDirectory 'share/vdpm/release-info.txt') `
+        -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "    $_" }
     Write-Host "--- the tail of pacman's log"
     Get-Content (Join-Path $installDirectory 'var/log/pacman.log') -Tail 6 `
         -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "    $_" }
