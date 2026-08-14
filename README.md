@@ -65,33 +65,46 @@ Signature checking, manifest parsing and digests are all performed by that
 helper so that a security decision never depends on which interpreter or
 command line tool happens to be installed on the host.
 
-No production public key has been committed yet. Until the VitaSDK
-organization provisions and publishes that key, channel refresh intentionally
-fails closed and no package-managed snapshot can be promoted to stable.
+The production public key is committed at `share/vdpm/channel-public-key.pem`
+and installed into every SDK. Refresh fails closed: a manifest whose signature
+does not verify against it is not parsed, and nothing is written to pacman's
+sync directory.
 
-## Transitional bootstrap
+## Bootstrap
 
-The mutable “latest master release” lookup has been removed. The Unix and
-Windows bootstrap programs accept only an explicitly selected immutable SDK
-archive and its published SHA-256:
+The bootstrap installs a release without being told which one. It reads the
+signed channel index, takes the newest series marked `supported`, downloads
+that release's `vitasdk-bootstrap-<host>` archive, verifies its SHA-256 against
+the published sidecar, extracts it, and selects the channel:
 
 ```sh
-VITASDK_BOOTSTRAP_URL='https://github.com/vitasdk/autobuilds/releases/download/<tag>/<asset>' \
-VITASDK_BOOTSTRAP_SHA256='<64 hexadecimal characters>' \
+git clone https://github.com/vitasdk/vdpm
+cd vdpm
 ./bootstrap-vitasdk.sh
+```
+
+`VITASDK_CHANNEL` names a different series — `nightly`, say — and `VITASDK`
+or `--install-dir` chooses where it lands.
+
+An exact archive can still be named, which is what a reproducible CI wants,
+and then no series is selected because none was asked for:
+
+```sh
+./bootstrap-vitasdk.sh \
+  --url 'https://github.com/vitasdk/autobuilds/releases/download/<tag>/<asset>' \
+  --sha256 '<64 hexadecimal characters>'
 ```
 
 PowerShell uses the equivalent `bootstrap-vitasdk.ps1`. Both implementations
 download into a temporary sibling directory, verify the digest, reject unsafe
 archive paths, extract and validate the package manager and compiler, and only
 then move the complete SDK into place. A failed bootstrap leaves no partial
-installation at the requested destination.
+installation at the requested destination, and an existing destination is
+refused rather than written over.
 
-This is intentionally a clean-install boundary. The old `packages.list`
-database cannot safely describe file ownership to Pacman, so replacing only
-the legacy `vdpm` executable inside an existing SDK is unsupported. The Bash
-and C Pacman frontends are interchangeable once the SDK already contains the
-new Pacman database and configuration.
+This is intentionally a clean-install boundary: the old `packages.list`
+database cannot describe file ownership to pacman, so an existing legacy SDK is
+replaced rather than converted.
 
 ## Component releases
 
