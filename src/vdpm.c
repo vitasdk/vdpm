@@ -280,6 +280,29 @@ static char *quote_windows_argument(const char *argument)
 	quoted[output] = '\0';
 	return quoted;
 }
+
+/*
+ * The MSYS runtime does not receive argv: it receives the raw command line and
+ * parses it again, expanding any wildcards it finds against the directory the
+ * caller happens to be in. A glob written for pacman -- an --overwrite pattern,
+ * a search pattern -- would arrive as the list of files sitting next to the
+ * user. The quoting above exists so the child sees the arguments vdpm built;
+ * this is the other half of that.
+ */
+static void keep_arguments_literal(void)
+{
+	const char *existing = getenv("MSYS");
+	char *setting;
+
+	if (!existing) {
+		_putenv("MSYS=noglob");
+		return;
+	}
+	setting = allocate(strlen(existing) + sizeof("MSYS= noglob"));
+	sprintf(setting, "MSYS=%s noglob", existing);
+	_putenv(setting);
+	free(setting);
+}
 #endif
 
 static int run_process(const char *path, char *const arguments[])
@@ -830,6 +853,9 @@ int main(int argc, char **argv)
 	int status;
 	enum command command = COMMAND_INSTALL;
 
+#ifdef _WIN32
+	keep_arguments_literal();
+#endif
 	if (argc > 1 && (strcmp(argv[1], "-h") == 0 ||
 			strcmp(argv[1], "--help") == 0)) {
 		usage(stdout);

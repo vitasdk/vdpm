@@ -218,6 +218,12 @@ try {
         # the one refresh just wrote, and with it the series this installation
         # is on. The selection belongs to the installation, not to the package.
         Copy-Item $configuration "${configuration}.selected"
+        # Pacman is an MSYS program, and those parse the command line again on
+        # their own, expanding wildcards against the directory the installer
+        # was started from. The overwrite patterns below would arrive as
+        # whatever files happen to be there, and pacman would read them as
+        # packages to install.
+        $env:MSYS = 'noglob'
         # The seed put the client on disk before pacman existed to record it,
         # so the package that owns those files takes them over here. Scoped to
         # the seed, and only ever in this empty staging directory.

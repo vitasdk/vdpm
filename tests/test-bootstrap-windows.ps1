@@ -25,7 +25,26 @@ function Check($what, $actual, $expected) {
     }
 }
 
-& (Join-Path $repository 'bootstrap-vitasdk.ps1') -InstallDirectory $installDirectory
+# MSYS programs expand the wildcards in their command line against the current
+# directory, so the installer's overwrite patterns turn into whatever sits next
+# to the user. Run it from a directory those patterns match, which is what the
+# first run of this test found and what nothing else would notice.
+$decoy = Join-Path $env:RUNNER_TEMP 'vitasdk-bootstrap-cwd'
+if (Test-Path $decoy) { Remove-Item -Recurse -Force $decoy }
+foreach ($path in 'here/bin', 'here/usr/bin', 'here/share/vdpm', 'here/etc') {
+    New-Item -ItemType Directory -Force -Path (Join-Path $decoy $path) | Out-Null
+}
+foreach ($path in 'here/bin/vdpm.exe', 'here/usr/bin/pacman.exe',
+        'here/share/vdpm/channel-public-key.pem', 'here/etc/pacman.conf') {
+    Set-Content -Path (Join-Path $decoy $path) -Value 'decoy'
+}
+
+Push-Location $decoy
+try {
+    & (Join-Path $repository 'bootstrap-vitasdk.ps1') -InstallDirectory $installDirectory
+} finally {
+    Pop-Location
+}
 if ($LASTEXITCODE -ne 0) { throw 'the bootstrap did not install' }
 
 $pacman = Join-Path $installDirectory 'usr/bin/pacman.exe'

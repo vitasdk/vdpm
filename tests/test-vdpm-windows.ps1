@@ -183,6 +183,24 @@ try {
         throw "vdpm left the package payload after removal"
     }
 
+    # Pacman is an MSYS program: it re-parses the command line it is handed and
+    # expands the wildcards in it against the current directory. What the user
+    # typed has to reach it, not the files that happen to be nearby.
+    $decoy = Join-Path $WorkDirectory "cwd"
+    New-Item -ItemType Directory -Force -Path $decoy | Out-Null
+    Set-Content -LiteralPath (Join-Path $decoy "${packageName}-decoy") -Value "decoy"
+    $globLog = Join-Path $WorkDirectory "glob.err"
+    Push-Location $decoy
+    try {
+        $reported = Invoke-Failing $vdpm @("${packageName}*") $globLog
+    }
+    finally {
+        Pop-Location
+    }
+    if ($reported.Text -notmatch [regex]::Escape("${packageName}*")) {
+        throw "the MSYS runtime rewrote vdpm's arguments: $($reported.Text)"
+    }
+
     # No channel has been selected yet, and saying so is the answer.
     $statusLog = Join-Path $WorkDirectory "status.err"
     $reported = Invoke-Failing $vdpm @("status") $statusLog

@@ -11,7 +11,10 @@ on:
       - patches/pacman/**
       - scripts/**
       - src/**
+      - bootstrap-vitasdk.ps1
       - tests/pacman/**
+      - tests/test-bootstrap-powershell.sh
+      - tests/test-bootstrap-windows.ps1
       - tests/test-release-bundle.sh
       - .github/workflows/release.yml
   push:
@@ -67,6 +70,10 @@ jobs:
         run: |
           brew install bash meson ninja pkg-config
           echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
+      - name: Exercise the Windows installer under PowerShell
+        if: matrix.host == 'x86_64-linux-gnu'
+        shell: bash
+        run: ./tests/test-bootstrap-powershell.sh
       - name: Build the complete product
         shell: bash
         run: |
