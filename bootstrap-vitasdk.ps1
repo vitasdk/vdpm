@@ -16,6 +16,14 @@ if (Test-Path $InstallDirectory) {
     throw "VitaSDK install directory already exists: ${InstallDirectory}"
 }
 
+# The root of trust is this script. It names the seed to fetch and the digest
+# of the channel key that seed must contain; the index, the manifest, the
+# databases and the packages are all verified with that key afterwards.
+$SeedRelease = 'v0.1.1'
+$SeedVersion = '0.1.1'
+$ChannelKeySha256 = 'c02df2e12216f6f633d94206634bbe8f244d74f610b29e922d7ea8bab2efb307'
+$installFromPackages = $false
+
 if ($ArchivePath -and -not $Sha256 -and (Test-Path "${ArchivePath}.sha256")) {
     $Sha256 = (Get-Content "${ArchivePath}.sha256" -Raw).Trim().Split()[0]
 }
@@ -62,7 +70,11 @@ if (-not $ArchivePath -and (-not $Url -or -not $Sha256)) {
         throw "The $Channel manifest names no core release"
     }
     if (-not $Url) {
-        $Url = "https://github.com/vitasdk/autobuilds/releases/download/$($manifestJson.core.release)/vitasdk-bootstrap-$hostArchitecture.tar.bz2"
+        # The seed is the client and nothing else: it can verify a channel and
+        # drive pacman, and the toolchain arrives as the package it is, so the
+        # installation is one pacman knows about and can move later.
+        $installFromPackages = $true
+        $Url = "https://github.com/vitasdk/vdpm/releases/download/$SeedRelease/vdpm-$SeedVersion-$hostArchitecture.tar.bz2"
     }
 
     if (-not $Sha256) {
@@ -147,14 +159,24 @@ try {
             }
         }
 
-    $required = @(
-        "bin/vdpm.exe",
-        "bin/arm-vita-eabi-gcc.exe",
-        "usr/bin/pacman.exe",
-        "usr/bin/msys-2.0.dll",
-        "etc/pacman.conf",
-        "version_info.txt"
-    )
+    $required = if ($installFromPackages) {
+        @(
+            "bin/vdpm.exe",
+            "usr/bin/pacman.exe",
+            "usr/bin/vdpm-channel.exe",
+            "usr/bin/msys-2.0.dll",
+            "share/vdpm/channel-public-key.pem"
+        )
+    } else {
+        @(
+            "bin/vdpm.exe",
+            "bin/arm-vita-eabi-gcc.exe",
+            "usr/bin/pacman.exe",
+            "usr/bin/msys-2.0.dll",
+            "etc/pacman.conf",
+            "version_info.txt"
+        )
+    }
     foreach ($relativePath in $required) {
         $path = Join-Path $stagingDirectory $relativePath
         if (-not (Test-Path -PathType Leaf $path)) {
@@ -165,6 +187,48 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "vdpm bootstrap self-test failed" }
     & (Join-Path $stagingDirectory "usr/bin/pacman.exe") --version | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "Pacman bootstrap self-test failed" }
+
+    if ($installFromPackages) {
+        # The one thing this script decides on its own. Everything the seed
+        # goes on to verify hangs off this key, so a seed carrying another one
+        # is a seed that could accept another channel.
+        $keyPath = Join-Path $stagingDirectory "share/vdpm/channel-public-key.pem"
+        $keyDigest = (Get-FileHash -Algorithm SHA256 $keyPath).Hash.ToLowerInvariant()
+        if ($keyDigest -ne $ChannelKeySha256) {
+            throw "the client seed carries an unexpected channel key"
+        }
+
+        # Selecting the series writes the verified databases, and installing
+        # the toolchain from them is what makes this an installation pacman
+        # knows about: it can be upgraded, moved to another series, and asked
+        # what it is.
+        $env:VITASDK = $stagingDirectory
+        & (Join-Path $stagingDirectory "bin/vdpm.exe") refresh $Channel
+        if ($LASTEXITCODE -ne 0) { throw "could not select the $Channel series" }
+
+        $pacman = Join-Path $stagingDirectory "usr/bin/pacman.exe"
+        $configuration = Join-Path $stagingDirectory "etc/pacman.conf"
+        New-Item -ItemType Directory -Force -Path `
+            (Join-Path $stagingDirectory "var/cache/pacman/pkg"), `
+            (Join-Path $stagingDirectory "var/log") | Out-Null
+        # A core that still ships a default pacman.conf would put it back over
+        # the one refresh just wrote, and with it the series this installation
+        # is on. The selection belongs to the installation, not to the package.
+        Copy-Item $configuration "${configuration}.selected"
+        # The seed put the client on disk before pacman existed to record it,
+        # so the package that owns those files takes them over here. Scoped to
+        # the seed, and only ever in this empty staging directory.
+        & $pacman --config $configuration --root $stagingDirectory `
+            --dbpath (Join-Path $stagingDirectory "var/lib/pacman") `
+            --cachedir (Join-Path $stagingDirectory "var/cache/pacman/pkg") `
+            --logfile (Join-Path $stagingDirectory "var/log/pacman.log") `
+            --noconfirm --noscriptlet --sync vitasdk-core `
+            --overwrite '*/bin/vdpm*' --overwrite '*/usr/bin/*' `
+            --overwrite '*/share/vdpm/*' --overwrite '*/etc/pacman.conf'
+        if ($LASTEXITCODE -ne 0) { throw "could not install the toolchain" }
+        Move-Item -Force "${configuration}.selected" $configuration
+        $Channel = ''
+    }
 
     Move-Item $stagingDirectory $InstallDirectory
     Write-Host "VitaSDK installed at ${InstallDirectory}"
