@@ -171,6 +171,12 @@ jobs:
             -PacmanExecutable (Join-Path $env:RUNNER_TEMP 'vdpm-pacman/pacman.exe') `
             -RuntimeDll (Join-Path $env:RUNNER_TEMP 'vdpm-pacman/msys-2.0.dll') `
             -Extended
+      - name: Install a real SDK with the bundle this job just built
+        shell: pwsh
+        env:
+          VITASDK_SEED_ARCHIVE: ${{ github.workspace }}/release/vdpm-${{ needs.prepare.outputs.version }}-x86_64-w64-mingw32.tar.bz2
+        run: ./tests/test-bootstrap-windows.ps1
+
       - name: Exercise atomic Windows bootstrap
         shell: pwsh
         run: |

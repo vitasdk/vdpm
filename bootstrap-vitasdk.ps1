@@ -42,7 +42,16 @@ if (-not $ArchivePath -and (-not $Url -or -not $Sha256)) {
         # drive pacman, and the toolchain arrives as the package it is, so the
         # installation is one pacman knows about and can move later.
         $installFromPackages = $true
-        $Url = "https://github.com/vitasdk/vdpm/releases/download/$SeedRelease/vdpm-$SeedVersion-$hostArchitecture.tar.bz2"
+        if ($env:VITASDK_SEED_ARCHIVE) {
+            # A seed the caller already has, which is how the job that builds
+            # a bundle tests it before publishing it.
+            $ArchivePath = $env:VITASDK_SEED_ARCHIVE
+            if (-not $Sha256 -and (Test-Path "${ArchivePath}.sha256")) {
+                $Sha256 = (Get-Content "${ArchivePath}.sha256" -Raw).Trim().Split()[0]
+            }
+        } else {
+            $Url = "https://github.com/vitasdk/vdpm/releases/download/$SeedRelease/vdpm-$SeedVersion-$hostArchitecture.tar.bz2"
+        }
     }
 
     if (-not $Sha256) {

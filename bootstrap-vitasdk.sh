@@ -137,7 +137,17 @@ if [[ -z $local_archive && ( -z $url || -z $expected_sha256 ) ]]; then
 		# package it is, so the installation is one pacman knows about and
 		# can move later.
 		install_from_packages=1
-		url="https://github.com/vitasdk/vdpm/releases/download/$SEED_RELEASE/vdpm-$SEED_VERSION-$host.tar.bz2"
+		if [[ -n ${VITASDK_SEED_ARCHIVE:-} ]]; then
+			# A seed the caller already has, which is how the job that builds
+			# a bundle tests it before publishing it.
+			local_archive=$VITASDK_SEED_ARCHIVE
+			expected_sha256=${VITASDK_SEED_SHA256:-}
+			if [[ -z $expected_sha256 && -f "${local_archive}.sha256" ]]; then
+				expected_sha256=$(awk '{print $1}' "${local_archive}.sha256")
+			fi
+		else
+			url="https://github.com/vitasdk/vdpm/releases/download/$SEED_RELEASE/vdpm-$SEED_VERSION-$host.tar.bz2"
+		fi
 	fi
 
 	if [[ -z $expected_sha256 ]]; then
