@@ -76,8 +76,23 @@ Check 'a series is selected' ([bool]$channel.channel) $true
 $env:VITASDK = $installDirectory
 $status = & (Join-Path $installDirectory 'bin/vdpm.exe') status
 Check 'status answers' ($LASTEXITCODE -eq 0) $true
-Check 'and names the toolchain it has' `
-    ([bool]($status | Select-String -Pattern '^Installed ')) $true
+
+# Which package owns the client decides what can be asked of it. A core built
+# before the split carries bin/vdpm.exe itself and installs it over the seed's,
+# so the SDK ends up running whatever client that core shipped -- older than
+# the one this job just built, and unable to answer for itself.
+$owner = & $pacman --config $configuration --root $installDirectory `
+    --dbpath $database --query --owns (Join-Path $installDirectory 'bin/vdpm.exe')
+$ownerPackage = if ($owner -match 'owned by (\S+)') { $Matches[1] } else { 'nobody' }
+Check 'the client belongs to a package' ($ownerPackage -ne 'nobody') $true
+if ($ownerPackage -eq 'vdpm') {
+    Check 'and names the toolchain it has' `
+        ([bool]($status | Select-String -Pattern '^Installed ')) $true
+} else {
+    Write-Host ("note: the published core still owns the client ($ownerPackage), " +
+        "so this SDK runs that core's vdpm and not the one under test. " +
+        "The split core has to be published before this can be checked.")
+}
 
 $status | ForEach-Object { Write-Host "    $_" }
 
@@ -97,23 +112,10 @@ if ($failures -ne 0) {
     # status asks pacman through cmd, which is the one call the test itself
     # does not make. If pacman answers here and not there, the difference is
     # the shell, not the query.
-    # status asks through cmd, and it spells its path arguments with forward
-    # slashes; the test asks directly, with backslashes. Both spellings, so a
-    # difference between them cannot hide.
-    foreach ($spelling in 'as status spells it', 'as the test spells it') {
-        $useSlashes = $spelling -eq 'as status spells it'
-        $arguments = @($configuration, $installDirectory, $database) | ForEach-Object {
-            if ($useSlashes) { $_ -replace '\\', '/' } else { $_ }
-        }
-        Write-Host "--- the same query, $spelling"
-        $line = "`"$pacman`" --config `"$($arguments[0])`" --root `"$($arguments[1])`"" +
-            " --dbpath `"$($arguments[2])`" --query vitasdk-core"
-        cmd.exe /c "`"$line`"" 2>&1 | ForEach-Object { Write-Host "    $_" }
-        Write-Host "    exit: $LASTEXITCODE"
-    }
-    Write-Host "--- status, keeping what it says on the error stream"
-    & (Join-Path $installDirectory 'bin/vdpm.exe') status 2>&1 |
-        ForEach-Object { Write-Host "    $_" }
+    Write-Host "--- which client the SDK ended up with"
+    Write-Host "    $owner"
+    Get-Content (Join-Path $installDirectory 'share/vdpm/release-info.txt') `
+        -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "    $_" }
     Write-Host "--- the tail of pacman's log"
     Get-Content (Join-Path $installDirectory 'var/log/pacman.log') -Tail 6 `
         -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "    $_" }
