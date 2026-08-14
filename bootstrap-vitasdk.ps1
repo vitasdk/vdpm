@@ -37,41 +37,6 @@ if (-not $ArchivePath -and (-not $Url -or -not $Sha256)) {
     
     $manifestBase = if ($env:VITASDK_CHANNEL_BASE_URL) { $env:VITASDK_CHANNEL_BASE_URL } else { "https://vitasdk.org/channels" }
 
-    # Nothing requested, or the `stable` alias: the index says which series is
-    # supported today. `stable` is not a channel and never was one -- there is
-    # no stable.json to fetch -- so it is resolved here and never stored, the
-    # way `latest` names a Docker image without being one.
-    if (-not $Channel -or $Channel -eq "stable") {
-        try {
-            $index = Invoke-RestMethod -Uri "$manifestBase/index.json" -Method Get -TimeoutSec 10
-        }
-        catch {
-            throw "Could not read the release index at $manifestBase/index.json"
-        }
-        # Series are named YYYY.MM, so the newest one is the highest year and
-        # then the highest month.
-        $Channel = $index.channels.PSObject.Properties |
-            Where-Object { $_.Value.status -eq "supported" } |
-            Sort-Object { [int]($_.Name -split '\.')[0] }, { [int]($_.Name -split '\.')[1] } -Descending |
-            Select-Object -First 1 -ExpandProperty Name
-        if (-not $Channel) {
-            throw "The release index at $manifestBase lists no supported series"
-        }
-        Write-Host "Installing the supported series $Channel"
-    }
-
-    # No fallback to anything else. Installing a series nobody asked for -- as
-    # resolving `stable` to the nightly used to do -- hands somebody the
-    # development channel while they believe they asked for the stable one.
-    try {
-        $manifestJson = Invoke-RestMethod -Uri "$manifestBase/$Channel.json" -Method Get -TimeoutSec 10
-    }
-    catch {
-        throw "Could not read the $Channel manifest at $manifestBase/$Channel.json"
-    }
-    if (-not ($manifestJson.core -and $manifestJson.core.release)) {
-        throw "The $Channel manifest names no core release"
-    }
     if (-not $Url) {
         # The seed is the client and nothing else: it can verify a channel and
         # drive pacman, and the toolchain arrives as the package it is, so the
@@ -205,6 +170,31 @@ try {
         # the toolchain from them is what makes this an installation pacman
         # knows about: it can be upgraded, moved to another series, and asked
         # what it is.
+        # Now, and not before, the index can be read: the seed carries the
+        # tool that checks its signature. Reading it earlier meant the answer
+        # to "which series is supported" arrived unverified, and that answer
+        # decides what gets installed.
+        if (-not $Channel -or $Channel -eq "stable") {
+            $indexPath = Join-Path $temporaryDirectory "index.json"
+            Invoke-WebRequest -Uri "$manifestBase/index.json" -OutFile $indexPath
+            Invoke-WebRequest -Uri "$manifestBase/index.json.sig" -OutFile "${indexPath}.sig"
+            & (Join-Path $stagingDirectory "usr/bin/vdpm-channel.exe") verify `
+                $indexPath "${indexPath}.sig" `
+                (Join-Path $stagingDirectory "share/vdpm/channel-public-key.pem")
+            if ($LASTEXITCODE -ne 0) {
+                throw "the release index is not signed by the expected key"
+            }
+            $index = Get-Content $indexPath -Raw | ConvertFrom-Json
+            $Channel = $index.channels.PSObject.Properties |
+                Where-Object { $_.Value.status -eq "supported" } |
+                Sort-Object -Property Name -Descending |
+                Select-Object -First 1 -ExpandProperty Name
+            if (-not $Channel) {
+                throw "the release index lists no supported series"
+            }
+            Write-Host "Installing the supported series $Channel"
+        }
+
         $env:VITASDK = $stagingDirectory
         & (Join-Path $stagingDirectory "bin/vdpm.exe") refresh $Channel
         if ($LASTEXITCODE -ne 0) { throw "could not select the $Channel series" }
