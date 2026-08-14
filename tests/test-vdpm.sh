@@ -65,4 +65,20 @@ if run_vdpm install; then
 	exit 1
 fi
 
+# Upgrading away from a core built before the client became its own package
+# takes etc/pacman.conf with it: that core owned the file and the new one does
+# not. The state is reachable, so the answer has to name the way out of it
+# rather than report a missing file.
+mv "$sdk_root/etc/pacman.conf" "$sdk_root/etc/pacman.conf.away"
+if message=$(run_vdpm upgrade 2>&1); then
+	printf 'an installation with no configuration was accepted\n' >&2
+	exit 1
+fi
+grep -q 'refresh <series>' <<< "$message" || {
+	printf 'the client did not say how to write the configuration back:\n%s\n' \
+		"$message" >&2
+	exit 1
+}
+mv "$sdk_root/etc/pacman.conf.away" "$sdk_root/etc/pacman.conf"
+
 printf 'vdpm pacman frontend contracts passed\n'

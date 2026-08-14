@@ -996,8 +996,18 @@ int main(int argc, char **argv)
 	if (access(pacman, X_OK) != 0)
 #endif
 		return fail_path("package client is not executable", pacman);
-	if (access(configuration, 4) != 0)
-		return fail_path("package configuration is not readable", configuration);
+	/* Naming the remedy, because the state is reachable and the file is not
+	 * something anyone edits by hand: refresh writes it, and a core built
+	 * before the client became its own package owned it, so upgrading away
+	 * from one takes the configuration with it. */
+	if (access(configuration, 4) != 0) {
+		fprintf(stderr,
+			"%s: this installation has no package configuration at %s\n"
+			"Run `%s refresh <series>` to write it. It names the release this\n"
+			"installation follows and the repositories that serve it.\n",
+			program_name, configuration, program_name);
+		return 1;
+	}
 	if (make_directories(database) != 0 || make_directories(cache) != 0 ||
 			make_directories(log_directory) != 0)
 		return fail("could not create the package state directories");
