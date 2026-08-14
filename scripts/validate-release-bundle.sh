@@ -53,11 +53,11 @@ test -s "$root/share/vdpm/licenses/vdpm-LGPL-2.1.txt"
 case $host in
 	*-w64-mingw32)
 		test -s "$root/bin/vdpm.exe"
-		test -s "$root/usr/bin/pacman.exe"
-		test -s "$root/usr/bin/vdpm-channel.exe"
-		test -s "$root/usr/bin/msys-2.0.dll"
+		test -s "$root/share/vdpm/msys/usr/bin/pacman.exe"
+		test -s "$root/share/vdpm/msys/usr/bin/vdpm-channel.exe"
+		test -s "$root/share/vdpm/msys/usr/bin/msys-2.0.dll"
 		# A client that cannot reach a repository is not a client.
-		test -s "$root/usr/ssl/certs/ca-bundle.crt"
+		test -s "$root/share/vdpm/msys/usr/ssl/certs/ca-bundle.crt"
 		test -s "$root/share/vdpm/refresh-repositories.ps1"
 		if [[ ${VDPM_VALIDATE_PE_IMPORTS:-0} == 1 ]]; then
 			command -v objdump >/dev/null

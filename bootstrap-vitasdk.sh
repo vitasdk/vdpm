@@ -253,13 +253,13 @@ done < <(find "$staging_directory" -type l -print0)
 
 case $(uname -s) in
 	MSYS*|MINGW*|CYGWIN*)
-		required=(bin/vdpm.exe bin/arm-vita-eabi-gcc.exe usr/bin/pacman.exe \
-			usr/bin/msys-2.0.dll etc/pacman.conf version_info.txt)
-		seed_required=(bin/vdpm.exe usr/bin/pacman.exe usr/bin/vdpm-channel.exe \
+		required=(bin/vdpm.exe bin/arm-vita-eabi-gcc.exe share/vdpm/msys/usr/bin/pacman.exe \
+			share/vdpm/msys/usr/bin/msys-2.0.dll etc/pacman.conf version_info.txt)
+		seed_required=(bin/vdpm.exe share/vdpm/msys/usr/bin/pacman.exe share/vdpm/msys/usr/bin/vdpm-channel.exe \
 			share/vdpm/channel-public-key.pem)
 		vdpm_binary="$staging_directory/bin/vdpm.exe"
-		channel_tool=usr/bin/vdpm-channel.exe
-		pacman_binary="$staging_directory/usr/bin/pacman.exe"
+		channel_tool=share/vdpm/msys/usr/bin/vdpm-channel.exe
+		pacman_binary="$staging_directory/share/vdpm/msys/usr/bin/pacman.exe"
 		;;
 	*)
 		required=(bin/vdpm bin/arm-vita-eabi-gcc bin/pacman bin/vdpm-channel \
@@ -342,7 +342,7 @@ if (( install_from_packages )); then
 		--noconfirm --noscriptlet \
 		--sync vitasdk-core --overwrite '*/bin/vdpm*' \
 		--overwrite '*/bin/pacman*' --overwrite '*/bin/include/*' \
-		--overwrite '*/usr/bin/*' --overwrite '*/share/vdpm/*' \
+		--overwrite '*/share/vdpm/*' \
 		--overwrite '*/etc/pacman.conf'
 	mv "$staging_directory/etc/pacman.conf.selected" \
 		"$staging_directory/etc/pacman.conf"

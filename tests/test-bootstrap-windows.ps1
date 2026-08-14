@@ -31,11 +31,15 @@ function Check($what, $actual, $expected) {
 # first run of this test found and what nothing else would notice.
 $decoy = Join-Path $env:RUNNER_TEMP 'vitasdk-bootstrap-cwd'
 if (Test-Path $decoy) { Remove-Item -Recurse -Force $decoy }
-foreach ($path in 'here/bin', 'here/usr/bin', 'here/share/vdpm', 'here/etc') {
+foreach ($path in 'here/bin', 'here/share/vdpm/msys/usr/bin', 'here/etc') {
     New-Item -ItemType Directory -Force -Path (Join-Path $decoy $path) | Out-Null
 }
-foreach ($path in 'here/bin/vdpm.exe', 'here/usr/bin/pacman.exe',
-        'here/share/vdpm/channel-public-key.pem', 'here/etc/pacman.conf') {
+# More than one file per pattern: one that expands to a single name is
+# swallowed by its own --overwrite and the problem stays hidden.
+foreach ($path in 'here/bin/vdpm.exe', 'here/etc/pacman.conf',
+        'here/share/vdpm/channel-public-key.pem', 'here/share/vdpm/list-channels.ps1',
+        'here/share/vdpm/msys/usr/bin/pacman.exe',
+        'here/share/vdpm/msys/usr/bin/msys-2.0.dll') {
     Set-Content -Path (Join-Path $decoy $path) -Value 'decoy'
 }
 
@@ -47,7 +51,7 @@ try {
 }
 if ($LASTEXITCODE -ne 0) { throw 'the bootstrap did not install' }
 
-$pacman = Join-Path $installDirectory 'usr/bin/pacman.exe'
+$pacman = Join-Path $installDirectory 'share/vdpm/msys/usr/bin/pacman.exe'
 $configuration = Join-Path $installDirectory 'etc/pacman.conf'
 $database = Join-Path $installDirectory 'var/lib/pacman'
 

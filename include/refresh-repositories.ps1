@@ -76,7 +76,7 @@ if ([string]::IsNullOrWhiteSpace($publicKey)) {
 }
 $script:ChannelTool = $env:VDPM_CHANNEL_TOOL
 if ([string]::IsNullOrWhiteSpace($script:ChannelTool)) {
-    $script:ChannelTool = Join-Path $sdkRoot "usr/bin/vdpm-channel.exe"
+    $script:ChannelTool = Join-Path $sdkRoot "share/vdpm/msys/usr/bin/vdpm-channel.exe"
 }
 Require-RegularFile $publicKey "channel public key is not installed"
 Require-RegularFile $script:ChannelTool "channel helper is not installed"

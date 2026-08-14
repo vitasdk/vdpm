@@ -28,9 +28,17 @@
  * pair around the whole line survives the stripping. */
 #define COMMAND_OPEN "\""
 #define COMMAND_CLOSE "\""
-/* Where the Windows bundle actually puts it, next to pacman.exe, rather than
- * in bin/ where the POSIX one lives. */
-#define CHANNEL_TOOL "usr/bin/vdpm-channel.exe"
+/*
+ * The MSYS programs live in a root of their own, deliberately away from the
+ * SDK's. An msys-2.0.dll under <sdk>/usr/bin makes the SDK itself an MSYS
+ * root, and an MSYS root has a built-in mount that turns /bin into /usr/bin:
+ * pacman would resolve --root <sdk> to /, and every file a package installs
+ * into bin/ -- the entire toolchain front end -- would land in usr/bin,
+ * nowhere near the %VITASDK%\bin the SDK tells people to put on PATH.
+ */
+#define MSYS_PREFIX "share/vdpm/msys/usr/"
+#define PACKAGE_CLIENT MSYS_PREFIX "bin/pacman.exe"
+#define CHANNEL_TOOL MSYS_PREFIX "bin/vdpm-channel.exe"
 #else
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -40,6 +48,7 @@
 #define DISCARD_ERRORS "2>/dev/null"
 #define COMMAND_OPEN ""
 #define COMMAND_CLOSE ""
+#define PACKAGE_CLIENT "bin/pacman"
 #define CHANNEL_TOOL "bin/vdpm-channel"
 #endif
 
@@ -619,9 +628,9 @@ static int refuse_self_replacement(char **base, int base_count)
 static void print_installed_core(const char *root)
 {
 #ifdef _WIN32
-	char *pacman = join_path(root, "usr/bin/pacman.exe");
+	char *pacman = join_path(root, PACKAGE_CLIENT);
 #else
-	char *pacman = join_path(root, "bin/pacman");
+	char *pacman = join_path(root, PACKAGE_CLIENT);
 #endif
 	char *database = join_path(root, "var/lib/pacman");
 	const char *config_environment = getenv("VDPM_PACMAN_CONF");
@@ -968,10 +977,10 @@ int main(int argc, char **argv)
 		pacman = duplicate_string(pacman_environment);
 #ifdef _WIN32
 	else
-		pacman = join_path(root, "usr/bin/pacman.exe");
+		pacman = join_path(root, PACKAGE_CLIENT);
 #else
 	else
-		pacman = join_path(root, "bin/pacman");
+		pacman = join_path(root, PACKAGE_CLIENT);
 #endif
 	configuration = config_environment && config_environment[0]
 		? duplicate_string(config_environment)

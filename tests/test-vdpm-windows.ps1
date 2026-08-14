@@ -59,7 +59,7 @@ $extract = Join-Path $WorkDirectory "extract"
 $build = Join-Path $WorkDirectory "build"
 $sdkRoot = Join-Path $WorkDirectory "sdk"
 $sdkBin = Join-Path $sdkRoot "bin"
-$pacmanBin = Join-Path $sdkRoot "usr/bin"
+$pacmanBin = Join-Path $sdkRoot "share/vdpm/msys/usr/bin"
 $dbPath = Join-Path $sdkRoot "var/lib/pacman"
 $syncPath = Join-Path $dbPath "sync"
 $cachePath = Join-Path $sdkRoot "var/cache/pacman/pkg"
@@ -132,10 +132,13 @@ Write-UnixText (Join-Path $packageRoot ".PKGINFO") @(
 Write-UnixText (Join-Path $packageRoot "arm-vita-eabi/include/msys-probe.h") @(
     "probe"
 )
+Write-UnixText (Join-Path $packageRoot "bin/msys-probe.exe") @(
+    "probe"
+)
 Invoke-Checked "tar.exe" @(
     "-cJf", $packagePath,
     "-C", $packageRoot,
-    ".PKGINFO", "arm-vita-eabi/include/msys-probe.h"
+    ".PKGINFO", "arm-vita-eabi/include/msys-probe.h", "bin/msys-probe.exe"
 )
 
 $packageSize = (Get-Item $packagePath).Length
@@ -177,10 +180,22 @@ try {
         throw "vdpm did not install the package payload"
     }
 
+    # bin/ is the directory the SDK tells people to put on PATH, and the one
+    # an MSYS root would quietly redirect to usr/bin.
+    $installedProgram = Join-Path $sdkRoot "bin/msys-probe.exe"
+    if (-not (Test-Path $installedProgram)) {
+        $elsewhere = Get-ChildItem -Recurse -Force -Filter 'msys-probe.exe' $sdkRoot |
+            Select-Object -First 1
+        throw "a package's bin/ file did not land in bin/: $($elsewhere.FullName)"
+    }
+
     # `-u` is the historical removal interface.
     Invoke-Checked $vdpm @("-u", $packageName)
     if (Test-Path $installedFile) {
         throw "vdpm left the package payload after removal"
+    }
+    if (Test-Path $installedProgram) {
+        throw "vdpm left the package program after removal"
     }
 
     # Pacman is an MSYS program: it re-parses the command line it is handed and

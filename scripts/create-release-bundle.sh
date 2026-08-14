@@ -39,8 +39,8 @@ required=(share/vdpm/THIRD_PARTY_NOTICES.md share/vdpm/licenses/vdpm-LGPL-2.1.tx
 case $host in
 	*-w64-mingw32)
 		required+=(
-			bin/vdpm.exe usr/bin/pacman.exe usr/bin/vdpm-channel.exe
-			usr/bin/msys-2.0.dll share/vdpm/refresh-repositories.ps1)
+			bin/vdpm.exe share/vdpm/msys/usr/bin/pacman.exe share/vdpm/msys/usr/bin/vdpm-channel.exe
+			share/vdpm/msys/usr/bin/msys-2.0.dll share/vdpm/refresh-repositories.ps1)
 		;;
 	*)
 		required+=(

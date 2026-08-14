@@ -153,16 +153,21 @@ jobs:
         run: |
           stage=$(cygpath -u "$GITHUB_WORKSPACE/stage")
           pacman_stage=$(cygpath -u "$RUNNER_TEMP/vdpm-pacman")
-          mkdir -p "$stage/usr/bin" "$stage/share/vdpm/licenses"
-          cp "$pacman_stage/pacman.exe" "$stage/usr/bin/"
-          cp "$pacman_stage/vdpm-channel.exe" "$stage/usr/bin/"
-          cp "$pacman_stage/msys-2.0.dll" "$stage/usr/bin/"
+          # An MSYS root of its own. Put msys-2.0.dll in the SDK's own usr/bin
+          # and the SDK becomes an MSYS root, whose built-in /bin -> /usr/bin
+          # mount then catches every file a package installs into bin/.
+          msys=$stage/share/vdpm/msys/usr
+          mkdir -p "$msys/bin" "$stage/share/vdpm/licenses"
+          cp "$pacman_stage/pacman.exe" "$msys/bin/"
+          cp "$pacman_stage/vdpm-channel.exe" "$msys/bin/"
+          cp "$pacman_stage/msys-2.0.dll" "$msys/bin/"
           cp -R "$pacman_stage/licenses/." "$stage/share/vdpm/licenses/"
           # Without these, pacman on Windows cannot open an HTTPS connection,
           # so it can verify a channel and then fail to download a single
-          # package from it. The path is where the MSYS runtime looks.
-          mkdir -p "$stage/usr/ssl/certs"
-          cp /usr/ssl/certs/ca-bundle.crt "$stage/usr/ssl/certs/"
+          # package from it. The path is where the MSYS runtime looks, which
+          # is relative to that root and moves with it.
+          mkdir -p "$msys/ssl/certs"
+          cp /usr/ssl/certs/ca-bundle.crt "$msys/ssl/certs/"
           revision=$(git rev-parse HEAD)
           scripts/create-release-bundle.sh \
             "$stage" "$PWD/release" x86_64-w64-mingw32 \

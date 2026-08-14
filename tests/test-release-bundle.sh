@@ -39,14 +39,15 @@ VDPM_VALIDATE_EXECUTABLES=1 \
 
 windows_root="$temporary_directory/windows-root"
 windows_output="$temporary_directory/windows-output"
-mkdir -p "$windows_root/bin" "$windows_root/usr/bin" "$windows_root/usr/ssl/certs" \
+mkdir -p "$windows_root/bin" "$windows_root/share/vdpm/msys/usr/bin" \
+	"$windows_root/share/vdpm/msys/usr/ssl/certs" \
 	"$windows_root/share/vdpm/licenses" "$windows_output"
 # A Windows bundle without a CA store can verify a channel and then fail to
 # download anything from it, so the validator refuses one and the fixture has
 # to carry it.
-printf 'certificates\n' > "$windows_root/usr/ssl/certs/ca-bundle.crt"
-for relative_path in bin/vdpm.exe usr/bin/pacman.exe \
-		usr/bin/vdpm-channel.exe usr/bin/msys-2.0.dll; do
+printf 'certificates\n' > "$windows_root/share/vdpm/msys/usr/ssl/certs/ca-bundle.crt"
+for relative_path in bin/vdpm.exe share/vdpm/msys/usr/bin/pacman.exe \
+		share/vdpm/msys/usr/bin/vdpm-channel.exe share/vdpm/msys/usr/bin/msys-2.0.dll; do
 	printf 'fixture %s\n' "$relative_path" > "$windows_root/$relative_path"
 done
 printf 'refresh fixture\n' > \

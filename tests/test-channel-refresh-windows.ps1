@@ -92,8 +92,9 @@ try {
 
     # Reading which release this is has to work against the bundle as it is
     # actually staged. This is the only test that sees that layout: the tool
-    # lives in usr/bin next to pacman.exe here, and the frontend spent a
-    # release looking for it in bin/ with nothing able to notice.
+    # lives in the MSYS root under share/vdpm here, next to pacman.exe, and the
+    # frontend spent a release looking for it in bin/ with nothing able to
+    # notice.
     $reported = & (Join-Path $sdkRoot "bin/vdpm.exe") status
     if ($LASTEXITCODE -ne 0) {
         throw "vdpm status failed against a staged Windows bundle"

@@ -119,7 +119,7 @@ if (Test-Path $FixtureDirectory) {
 $downloads = Join-Path $FixtureDirectory "downloads"
 $extract = Join-Path $FixtureDirectory "extract"
 $sdkRoot = Join-Path $WorkDirectory "sdk"
-$pacmanBin = Join-Path $sdkRoot "usr/bin"
+$pacmanBin = Join-Path $sdkRoot "share/vdpm/msys/usr/bin"
 $dbPath = Join-Path $sdkRoot "var/lib/pacman"
 $cachePath = Join-Path $sdkRoot "var/cache/pacman/pkg"
 $logPath = Join-Path $sdkRoot "var/log/pacman.log"

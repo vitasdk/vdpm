@@ -139,18 +139,18 @@ try {
     $required = if ($installFromPackages) {
         @(
             "bin/vdpm.exe",
-            "usr/bin/pacman.exe",
-            "usr/bin/vdpm-channel.exe",
-            "usr/bin/msys-2.0.dll",
-            "usr/ssl/certs/ca-bundle.crt",
+            "share/vdpm/msys/usr/bin/pacman.exe",
+            "share/vdpm/msys/usr/bin/vdpm-channel.exe",
+            "share/vdpm/msys/usr/bin/msys-2.0.dll",
+            "share/vdpm/msys/usr/ssl/certs/ca-bundle.crt",
             "share/vdpm/channel-public-key.pem"
         )
     } else {
         @(
             "bin/vdpm.exe",
             "bin/arm-vita-eabi-gcc.exe",
-            "usr/bin/pacman.exe",
-            "usr/bin/msys-2.0.dll",
+            "share/vdpm/msys/usr/bin/pacman.exe",
+            "share/vdpm/msys/usr/bin/msys-2.0.dll",
             "etc/pacman.conf",
             "version_info.txt"
         )
@@ -163,7 +163,7 @@ try {
     }
     & (Join-Path $stagingDirectory "bin/vdpm.exe") --help | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "vdpm bootstrap self-test failed" }
-    & (Join-Path $stagingDirectory "usr/bin/pacman.exe") --version | Out-Null
+    & (Join-Path $stagingDirectory "share/vdpm/msys/usr/bin/pacman.exe") --version | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "Pacman bootstrap self-test failed" }
 
     if ($installFromPackages) {
@@ -188,7 +188,7 @@ try {
             $indexPath = Join-Path $temporaryDirectory "index.json"
             Invoke-WebRequest -Uri "$manifestBase/index.json" -OutFile $indexPath
             Invoke-WebRequest -Uri "$manifestBase/index.json.sig" -OutFile "${indexPath}.sig"
-            & (Join-Path $stagingDirectory "usr/bin/vdpm-channel.exe") verify `
+            & (Join-Path $stagingDirectory "share/vdpm/msys/usr/bin/vdpm-channel.exe") verify `
                 $indexPath "${indexPath}.sig" `
                 (Join-Path $stagingDirectory "share/vdpm/channel-public-key.pem")
             if ($LASTEXITCODE -ne 0) {
@@ -209,7 +209,7 @@ try {
         & (Join-Path $stagingDirectory "bin/vdpm.exe") refresh $Channel
         if ($LASTEXITCODE -ne 0) { throw "could not select the $Channel series" }
 
-        $pacman = Join-Path $stagingDirectory "usr/bin/pacman.exe"
+        $pacman = Join-Path $stagingDirectory "share/vdpm/msys/usr/bin/pacman.exe"
         $configuration = Join-Path $stagingDirectory "etc/pacman.conf"
         New-Item -ItemType Directory -Force -Path `
             (Join-Path $stagingDirectory "var/cache/pacman/pkg"), `
@@ -232,8 +232,8 @@ try {
             --cachedir (Join-Path $stagingDirectory "var/cache/pacman/pkg") `
             --logfile (Join-Path $stagingDirectory "var/log/pacman.log") `
             --noconfirm --noscriptlet --sync vitasdk-core `
-            --overwrite '*/bin/vdpm*' --overwrite '*/usr/bin/*' `
-            --overwrite '*/share/vdpm/*' --overwrite '*/etc/pacman.conf'
+            --overwrite '*/bin/vdpm*' --overwrite '*/share/vdpm/*' `
+            --overwrite '*/etc/pacman.conf'
         if ($LASTEXITCODE -ne 0) { throw "could not install the toolchain" }
         Move-Item -Force "${configuration}.selected" $configuration
         $Channel = ''
