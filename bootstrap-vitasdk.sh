@@ -184,6 +184,13 @@ download_to_file() {
 install_parent=$(dirname "$install_directory")
 mkdir -p "$install_parent"
 install_parent=$(cd "$install_parent" && pwd -P)
+# At the filesystem root pwd -P answers "/", and composing onto that doubles
+# the separator. The staging path then reads //.vitasdk-bootstrap.X/root while
+# realpath answers /.vitasdk-bootstrap.X/root, so the prefix check that keeps
+# an archive from writing outside the staging directory rejects every link the
+# SDK has: installing into any top-level directory fails, and the reason it
+# gives is that the archive contains an escaping symbolic link.
+install_parent=${install_parent%/}
 install_directory="$install_parent/$(basename "$install_directory")"
 temporary_directory=$(mktemp -d "$install_parent/.vitasdk-bootstrap.XXXXXXXX")
 downloaded_archive="$temporary_directory/vitasdk.tar.bz2"

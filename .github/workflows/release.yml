@@ -13,7 +13,9 @@ on:
       - src/**
       - bootstrap-vitasdk.ps1
       - tests/pacman/**
+      - bootstrap-vitasdk.sh
       - tests/test-bootstrap-powershell.sh
+      - tests/test-bootstrap-root-install.sh
       - tests/test-bootstrap-windows.ps1
       - tests/test-release-bundle.sh
       - .github/workflows/release.yml
@@ -74,6 +76,12 @@ jobs:
         if: matrix.host == 'x86_64-linux-gnu'
         shell: bash
         run: ./tests/test-bootstrap-powershell.sh
+      # Needs a machine whose root it may write to, which is why nothing had
+      # ever installed into a top-level directory.
+      - name: Install into a top-level directory
+        if: matrix.host == 'x86_64-linux-gnu'
+        shell: bash
+        run: ./tests/test-bootstrap-root-install.sh
       - name: Build the complete product
         shell: bash
         run: |
