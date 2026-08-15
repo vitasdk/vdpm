@@ -192,7 +192,7 @@ install_parent=$(cd "$install_parent" && pwd -P)
 # gives is that the archive contains an escaping symbolic link.
 install_parent=${install_parent%/}
 install_directory="$install_parent/$(basename "$install_directory")"
-temporary_directory=$(mktemp -d "$install_parent/.vitasdk-bootstrap.XXXXXXXX")
+temporary_directory=$(mktemp -d "${TMPDIR:-/tmp}/.vitasdk-bootstrap.XXXXXXXX")
 downloaded_archive="$temporary_directory/vitasdk.tar.bz2"
 staging_directory="$temporary_directory/root"
 cleanup() { rm -rf -- "$temporary_directory"; }
@@ -358,7 +358,11 @@ fi
 
 installed_vdpm="$install_directory/${vdpm_binary#"$staging_directory"/}"
 
-mv "$staging_directory" "$install_directory"
+if [[ -w ${install_parent:=/} ]]; then
+  mv "$staging_directory" "$install_directory"
+else
+  sudo mv "$staging_directory" "$install_directory"
+fi
 printf 'VitaSDK installed at %s\n' "$install_directory"
 
 # The series has to be written into the SDK, not merely used to pick an
