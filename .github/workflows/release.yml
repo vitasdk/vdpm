@@ -20,7 +20,7 @@ on:
       - tests/test-release-bundle.sh
       - .github/workflows/release.yml
   push:
-    branches: [master, next]
+    branches: [master]
     tags: ['v*']
   workflow_dispatch:
 

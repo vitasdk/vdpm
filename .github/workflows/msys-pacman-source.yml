@@ -13,7 +13,6 @@ on:
   push:
     branches:
       - master
-      - next
     paths:
       - .gitattributes
       - CMakeLists.txt

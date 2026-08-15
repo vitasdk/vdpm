@@ -8,7 +8,6 @@ on:
   push:
     branches:
       - master
-      - next
     paths:
       - tests/pacman/msys-runtime-smoke.ps1
       - .github/workflows/msys-pacman-smoke.yml
