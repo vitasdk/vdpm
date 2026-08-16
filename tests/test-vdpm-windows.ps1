@@ -81,6 +81,7 @@ $databaseEntry = Join-Path $databaseRoot "${packageName}-${packageVersion}"
     $cachePath,
     (Split-Path $configPath),
     (Join-Path $packageRoot "arm-vita-eabi/include"),
+    (Join-Path $packageRoot "bin"),
     $databaseEntry
 ) | ForEach-Object { New-Item -ItemType Directory -Force -Path $_ | Out-Null }
 
