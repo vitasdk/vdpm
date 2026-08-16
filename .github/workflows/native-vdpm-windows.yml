@@ -24,7 +24,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Exercise native vdpm over minimal MSYS pacman
         shell: pwsh
         run: ./tests/test-vdpm-windows.ps1

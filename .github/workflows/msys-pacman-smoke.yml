@@ -18,7 +18,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Exercise pacman with only the MSYS runtime DLL
         shell: pwsh
         run: ./tests/pacman/msys-runtime-smoke.ps1

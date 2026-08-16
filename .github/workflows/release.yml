@@ -34,7 +34,7 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       source_date_epoch: ${{ steps.release.outputs.source_date_epoch }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - id: release
         shell: bash
         run: |
@@ -61,7 +61,7 @@ jobs:
             runner: macos-15
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
         run: |
@@ -108,7 +108,7 @@ jobs:
             '${{ needs.prepare.outputs.version }}' "$revision"
           VDPM_VALIDATE_EXECUTABLES=1 scripts/validate-release-bundle.sh \
             release/*.tar.bz2 '${{ matrix.host }}'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: vdpm-${{ matrix.host }}
           path: release/*
@@ -119,7 +119,7 @@ jobs:
     needs: prepare
     runs-on: windows-2025
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: msys2/setup-msys2@v2
         id: msys2
         with:
@@ -221,7 +221,7 @@ jobs:
           ./tests/test-channel-refresh-windows.ps1 `
             -ProductRoot (Join-Path $pwd 'stage') `
             -OpenSslExecutable (Join-Path '${{ steps.msys2.outputs.msys2-location }}' 'usr/bin/openssl.exe')
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: vdpm-x86_64-w64-mingw32
           path: release/*
@@ -232,8 +232,8 @@ jobs:
     needs: [prepare, build-unix, build-windows]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: vdpm-*
           path: release
@@ -264,7 +264,7 @@ jobs:
             sha256sum -- *.tar.bz2 bootstrap-vitasdk.sh bootstrap-vitasdk.ps1 |
               LC_ALL=C sort -k2 > SHA256SUMS
           )
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: vdpm-release
           path: release/*
@@ -278,7 +278,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: vdpm-release
           path: release
