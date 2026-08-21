@@ -64,7 +64,7 @@ PACKAGES=(
 	libmpeg2
 	soloud
 	quirc
-	Box2D
+	box2d
 	libsndfile
 	xz
 	libarchive
