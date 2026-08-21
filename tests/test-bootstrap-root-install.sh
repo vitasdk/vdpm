@@ -22,11 +22,13 @@ trap 'rm -rf -- "$temporary_directory"' EXIT
 # The same shape as the fixture in test-bootstrap.sh, with the links the real
 # SDK carries: without one the check being tested never runs.
 archive_root="$temporary_directory/archive/vitasdk"
-mkdir -p "$archive_root/bin/include" "$archive_root/etc" "$archive_root/lib"
-for program in vdpm pacman vdpm-channel arm-vita-eabi-gcc; do
+mkdir -p "$archive_root/bin/include" "$archive_root/libexec/vdpm" "$archive_root/etc" "$archive_root/lib"
+for program in vdpm vdpm-channel arm-vita-eabi-gcc; do
 	printf '#!/bin/sh\nexit 0\n' > "$archive_root/bin/$program"
 	chmod +x "$archive_root/bin/$program"
 done
+printf '#!/bin/sh\nexit 0\n' > "$archive_root/libexec/vdpm/pacman"
+chmod +x "$archive_root/libexec/vdpm/pacman"
 printf 'refresh\n' > "$archive_root/bin/include/refresh-repositories.sh"
 chmod +x "$archive_root/bin/include/refresh-repositories.sh"
 printf '[options]\nArchitecture = test vita\n' > "$archive_root/etc/pacman.conf"

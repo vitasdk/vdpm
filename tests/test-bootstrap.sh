@@ -8,11 +8,13 @@ cleanup() { rm -rf -- "$temporary_directory"; }
 trap cleanup EXIT
 
 archive_root="$temporary_directory/archive/vitasdk"
-mkdir -p "$archive_root/bin/include" "$archive_root/etc"
-for executable in pacman vdpm-channel arm-vita-eabi-gcc; do
+mkdir -p "$archive_root/bin/include" "$archive_root/libexec/vdpm" "$archive_root/etc"
+for executable in vdpm-channel arm-vita-eabi-gcc; do
 	printf '#!/usr/bin/env sh\nexit 0\n' > "$archive_root/bin/$executable"
 	chmod +x "$archive_root/bin/$executable"
 done
+printf '#!/usr/bin/env sh\nexit 0\n' > "$archive_root/libexec/vdpm/pacman"
+chmod +x "$archive_root/libexec/vdpm/pacman"
 # Records what it was asked to do, so the test can tell whether the bootstrap
 # selected the series it resolved instead of leaving the SDK on none.
 cat > "$archive_root/bin/vdpm" <<'FAKE'

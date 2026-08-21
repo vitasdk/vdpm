@@ -13,13 +13,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "$sdk_root/bin/include" "$sdk_root/etc"
-cat > "$sdk_root/bin/pacman" <<'EOF'
+mkdir -p "$sdk_root/bin/include" "$sdk_root/libexec/vdpm" "$sdk_root/etc"
+cat > "$sdk_root/libexec/vdpm/pacman" <<'EOF'
 #!/usr/bin/env bash
 printf '%q ' "$@" >> "$VDPM_TEST_LOG"
 printf '\n' >> "$VDPM_TEST_LOG"
 EOF
-chmod +x "$sdk_root/bin/pacman"
+chmod +x "$sdk_root/libexec/vdpm/pacman"
 cat > "$sdk_root/bin/include/refresh-repositories.sh" <<'EOF'
 #!/usr/bin/env bash
 printf 'refresh %s\n' "$1" >> "$VDPM_TEST_LOG"

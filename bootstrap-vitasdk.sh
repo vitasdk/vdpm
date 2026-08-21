@@ -269,13 +269,13 @@ case $(uname -s) in
 		pacman_binary="$staging_directory/share/vdpm/msys/usr/bin/pacman.exe"
 		;;
 	*)
-		required=(bin/vdpm bin/arm-vita-eabi-gcc bin/pacman bin/vdpm-channel \
+		required=(bin/vdpm bin/arm-vita-eabi-gcc libexec/vdpm/pacman bin/vdpm-channel \
 			bin/include/refresh-repositories.sh etc/pacman.conf version_info.txt)
-		seed_required=(bin/vdpm bin/pacman bin/vdpm-channel \
+		seed_required=(bin/vdpm libexec/vdpm/pacman bin/vdpm-channel \
 			bin/include/refresh-repositories.sh share/vdpm/channel-public-key.pem)
 		vdpm_binary="$staging_directory/bin/vdpm"
 		channel_tool=bin/vdpm-channel
-		pacman_binary="$staging_directory/bin/pacman"
+		pacman_binary="$staging_directory/libexec/vdpm/pacman"
 		;;
 esac
 (( install_from_packages )) && required=("${seed_required[@]}")
@@ -348,7 +348,7 @@ if (( install_from_packages )); then
 		--logfile "$staging_directory/var/log/pacman.log" \
 		--noconfirm --noscriptlet \
 		--sync vitasdk-core --overwrite '*/bin/vdpm*' \
-		--overwrite '*/bin/pacman*' --overwrite '*/bin/include/*' \
+		--overwrite '*/libexec/vdpm/pacman*' --overwrite '*/bin/include/*' \
 		--overwrite '*/share/vdpm/*' \
 		--overwrite '*/etc/pacman.conf'
 	mv "$staging_directory/etc/pacman.conf.selected" \

@@ -16,13 +16,13 @@ build=${VDPM_TEST_BUILD_DIR:-}
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
 
-mkdir -p "$root/bin/include" "$root/var/lib/vdpm" "$root/etc"
+mkdir -p "$root/bin/include" "$root/libexec/vdpm" "$root/var/lib/vdpm" "$root/etc"
 cp "$build/vdpm-channel" "$root/bin/"
 cp "$directory/include/list-channels.sh" "$root/bin/include/"
 chmod +x "$root/bin/include/"*.sh
 printf '[options]\n' > "$root/etc/pacman.conf"
-printf '#!/bin/sh\nexit 0\n' > "$root/bin/pacman"
-chmod +x "$root/bin/pacman"
+printf '#!/bin/sh\nexit 0\n' > "$root/libexec/vdpm/pacman"
+chmod +x "$root/libexec/vdpm/pacman"
 
 manifest()
 {
@@ -99,13 +99,13 @@ fi
 # whose move was interrupted, or that was unpacked rather than installed,
 # named a toolchain it did not carry.
 manifest 2026.09
-printf '#!/bin/sh\necho "vitasdk-core 2026.08.0-1"\n' > "$root/bin/pacman"
-chmod +x "$root/bin/pacman"
+printf '#!/bin/sh\necho "vitasdk-core 2026.08.0-1"\n' > "$root/libexec/vdpm/pacman"
+chmod +x "$root/libexec/vdpm/pacman"
 output=$(VITASDK="$root" "$build/vdpm" status 2>&1)
 check "installed core" "$output" "Installed 2026.08.0-1"
 
-printf '#!/bin/sh\nexit 1\n' > "$root/bin/pacman"
-chmod +x "$root/bin/pacman"
+printf '#!/bin/sh\nexit 1\n' > "$root/libexec/vdpm/pacman"
+chmod +x "$root/libexec/vdpm/pacman"
 output=$(VITASDK="$root" "$build/vdpm" status 2>&1)
 check "unmanaged prefix" "$output" "no registered toolchain"
 
