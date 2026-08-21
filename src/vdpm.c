@@ -48,7 +48,9 @@
 #define DISCARD_ERRORS "2>/dev/null"
 #define COMMAND_OPEN ""
 #define COMMAND_CLOSE ""
-#define PACKAGE_CLIENT "bin/pacman"
+/* Kept off PATH: nothing here looks pacman up by name, and a Linux
+ * distribution's own pacman must stay reachable as plain "pacman". */
+#define PACKAGE_CLIENT "libexec/vdpm/pacman"
 #define CHANNEL_TOOL "bin/vdpm-channel"
 #endif
 

@@ -84,8 +84,11 @@ case $host in
 		fi
 		;;
 	*)
-		for executable in vdpm pacman pacman-conf vdpm-channel; do
+		for executable in vdpm vdpm-channel; do
 			test -x "$root/bin/$executable"
+		done
+		for executable in pacman pacman-conf; do
+			test -x "$root/libexec/vdpm/$executable"
 		done
 		test -x "$root/bin/include/host-triplet.sh"
 		test -x "$root/bin/include/refresh-repositories.sh"
@@ -104,7 +107,7 @@ case $host in
 		done
 		if [[ ${VDPM_VALIDATE_EXECUTABLES:-0} == 1 ]]; then
 			"$root/bin/vdpm" --help >/dev/null
-			"$root/bin/pacman" --version >/dev/null
+			"$root/libexec/vdpm/pacman" --version >/dev/null
 			"$root/bin/vdpm-channel" sha256 \
 				"$root/share/vdpm/THIRD_PARTY_NOTICES.md" >/dev/null
 		fi

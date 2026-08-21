@@ -36,7 +36,7 @@ check() {
 		failures=$((failures + 1)); fi
 }
 installed_core() {
-	pacman --config /opt/sdk/etc/pacman.conf --root /opt/sdk \
+	/opt/sdk/libexec/vdpm/pacman --config /opt/sdk/etc/pacman.conf --root /opt/sdk \
 		--dbpath /opt/sdk/var/lib/pacman --query vitasdk-core 2>/dev/null |
 		awk '{print $2}'
 }

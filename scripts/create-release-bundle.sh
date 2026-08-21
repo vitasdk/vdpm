@@ -44,7 +44,7 @@ case $host in
 		;;
 	*)
 		required+=(
-			bin/vdpm bin/pacman bin/pacman-conf bin/vdpm-channel
+			bin/vdpm libexec/vdpm/pacman libexec/vdpm/pacman-conf bin/vdpm-channel
 			bin/include/host-triplet.sh bin/include/refresh-repositories.sh
 			share/vdpm/licenses/pacman-GPL-2.0.txt
 			share/vdpm/licenses/zlib.txt

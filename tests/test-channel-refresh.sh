@@ -17,7 +17,7 @@ build=${VDPM_TEST_BUILD_DIR:-}
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
 
-mkdir -p "$root/bin/include" "$root/var/lib/vdpm" "$root/etc"
+mkdir -p "$root/bin/include" "$root/libexec/vdpm" "$root/var/lib/vdpm" "$root/etc"
 printf '[options]\n' > "$root/etc/pacman.conf"
 printf '{"channel":"2026.08","sequence":1,"core":{"release":"core-1"},"packages":{"release":"packages-1"}}\n' \
 	> "$root/var/lib/vdpm/channel.json"
@@ -33,12 +33,12 @@ EOF
 chmod +x "$root/bin/include/refresh-repositories.sh"
 
 pacman_stub() {
-	cat > "$root/bin/pacman" <<EOF
+	cat > "$root/libexec/vdpm/pacman" <<EOF
 #!/bin/sh
 printf '%s\n' "\$@" > "$root/pacman-arguments"
 exit $1
 EOF
-	chmod +x "$root/bin/pacman"
+	chmod +x "$root/libexec/vdpm/pacman"
 }
 
 selected_channel() {

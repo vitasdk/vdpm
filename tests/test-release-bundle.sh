@@ -8,11 +8,15 @@ cleanup() { rm -rf -- "$temporary_directory"; }
 trap cleanup EXIT
 
 root="$temporary_directory/root"
-mkdir -p "$root/bin/include" "$root/share/vdpm/licenses" \
+mkdir -p "$root/bin/include" "$root/libexec/vdpm" "$root/share/vdpm/licenses" \
 	"$temporary_directory/output-one" "$temporary_directory/output-two"
-for executable in vdpm pacman pacman-conf vdpm-channel; do
+for executable in vdpm vdpm-channel; do
 	printf '#!/usr/bin/env sh\nexit 0\n' > "$root/bin/$executable"
 	chmod +x "$root/bin/$executable"
+done
+for executable in pacman pacman-conf; do
+	printf '#!/usr/bin/env sh\nexit 0\n' > "$root/libexec/vdpm/$executable"
+	chmod +x "$root/libexec/vdpm/$executable"
 done
 for helper in host-triplet.sh refresh-repositories.sh; do
 	printf '#!/usr/bin/env sh\nexit 0\n' > "$root/bin/include/$helper"

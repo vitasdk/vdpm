@@ -210,9 +210,9 @@ function(vdpm_add_package_client install_dir)
         BUILD_COMMAND ${CMAKE_COMMAND} -E env
             "PKG_CONFIG_PATH=${pacman_pkg_config_path}"
             ${MESON_EXECUTABLE} compile -C <BINARY_DIR>
-        INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory ${install_dir}/bin
-        COMMAND ${CMAKE_COMMAND} -E copy <BINARY_DIR>/pacman ${install_dir}/bin/pacman
-        COMMAND ${CMAKE_COMMAND} -E copy <BINARY_DIR>/pacman-conf ${install_dir}/bin/pacman-conf
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory ${install_dir}/libexec/vdpm
+        COMMAND ${CMAKE_COMMAND} -E copy <BINARY_DIR>/pacman ${install_dir}/libexec/vdpm/pacman
+        COMMAND ${CMAKE_COMMAND} -E copy <BINARY_DIR>/pacman-conf ${install_dir}/libexec/vdpm/pacman-conf
         COMMAND ${CMAKE_COMMAND} -E make_directory ${license_dir}
         COMMAND ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/COPYING
             ${license_dir}/pacman-GPL-2.0.txt
