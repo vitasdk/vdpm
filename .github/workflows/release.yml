@@ -18,6 +18,7 @@ on:
       - tests/test-bootstrap-root-install.sh
       - tests/test-bootstrap-seed.sh
       - tests/test-bootstrap-windows.ps1
+      - tests/test-host-triplet.sh
       - tests/test-release-bundle.sh
       - .github/workflows/release.yml
   push:
@@ -70,6 +71,10 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
+      - name: Exercise the host triplet contract
+        if: matrix.host == 'x86_64-linux-gnu'
+        shell: bash
+        run: ./tests/test-host-triplet.sh
       - name: Exercise the Windows installer under PowerShell
         if: matrix.host == 'x86_64-linux-gnu'
         shell: bash
