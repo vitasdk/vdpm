@@ -84,4 +84,6 @@ if(BUILD_TESTING AND UNIX)
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-channel-names.sh")
     add_test(NAME vdpm-bootstrap-contract
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-bootstrap.sh")
+    add_test(NAME vdpm-host-triplet-contract
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-host-triplet.sh")
 endif()

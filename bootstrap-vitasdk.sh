@@ -78,7 +78,7 @@ detect_host_triplet() {
 	case $architecture in
 		amd64) architecture=x86_64 ;;
 		arm64|aarch64)
-			if [[ $(uname -s) == Linux ]]; then
+			if [[ $(uname -s) == Linux || $(uname -s) == FreeBSD ]]; then
 				architecture=aarch64
 			else
 				architecture=arm64
@@ -87,7 +87,14 @@ detect_host_triplet() {
 	esac
 	case $(uname -s) in
 		Darwin*) printf '%s-apple-darwin\n' "$architecture" ;;
-		Linux*) printf '%s-linux-gnu\n' "$architecture" ;;
+		Linux*)
+			if ldd --version 2>&1 | grep -qi musl; then
+				printf '%s-linux-musl\n' "$architecture"
+			else
+				printf '%s-linux-gnu\n' "$architecture"
+			fi
+			;;
+		FreeBSD*) printf '%s-unknown-freebsd\n' "$architecture" ;;
 		MSYS*|MINGW*|CYGWIN*) printf '%s-w64-mingw32\n' "$architecture" ;;
 		*) return 1 ;;
 	esac
