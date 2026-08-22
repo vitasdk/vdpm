@@ -44,19 +44,26 @@ if(BUILD_VDPM_PACKAGE_CLIENT)
     vdpm_add_package_client("${VDPM_PACKAGE_CLIENT_INSTALL_PREFIX}")
 
     if(vdpm_build_channel)
+        set(vdpm_channel_cmake_args
+            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_INSTALL_PREFIX=${VDPM_PACKAGE_CLIENT_INSTALL_PREFIX}
+            "-DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}"
+            "-DCMAKE_EXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}"
+            -DBUILD_VDPM_FRONTEND=OFF
+            -DBUILD_VDPM_CHANNEL=ON
+            -DOPENSSL_ROOT_DIR=${CMAKE_BINARY_DIR}/package-client-deps
+            -DOPENSSL_USE_STATIC_LIBS=TRUE)
+        if(CMAKE_TOOLCHAIN_FILE)
+            get_filename_component(vdpm_channel_toolchain_file
+                "${CMAKE_TOOLCHAIN_FILE}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
+            list(APPEND vdpm_channel_cmake_args
+                -DCMAKE_TOOLCHAIN_FILE=${vdpm_channel_toolchain_file})
+        endif()
         ExternalProject_Add(vdpm-channel-product
             DEPENDS openssl-pacman
             DOWNLOAD_COMMAND ""
             SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src"
-            CMAKE_ARGS
-                -DCMAKE_BUILD_TYPE=Release
-                -DCMAKE_INSTALL_PREFIX=${VDPM_PACKAGE_CLIENT_INSTALL_PREFIX}
-                "-DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}"
-                "-DCMAKE_EXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}"
-                -DBUILD_VDPM_FRONTEND=OFF
-                -DBUILD_VDPM_CHANNEL=ON
-                -DOPENSSL_ROOT_DIR=${CMAKE_BINARY_DIR}/package-client-deps
-                -DOPENSSL_USE_STATIC_LIBS=TRUE)
+            CMAKE_ARGS ${vdpm_channel_cmake_args})
         add_dependencies(vdpm-package-client vdpm-channel-product)
     endif()
 else()

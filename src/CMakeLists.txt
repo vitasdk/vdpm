@@ -22,6 +22,7 @@ endif()
 # link requirements of a static libcrypto.
 if(BUILD_VDPM_CHANNEL)
     find_package(OpenSSL REQUIRED)
+    find_package(Threads REQUIRED) # static libcrypto needs pthread_create on FreeBSD
 
     add_executable(vdpm-channel vdpm-channel.c)
     if(MSVC)
@@ -29,7 +30,7 @@ if(BUILD_VDPM_CHANNEL)
             "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     endif()
     target_compile_features(vdpm-channel PRIVATE c_std_99)
-    target_link_libraries(vdpm-channel PRIVATE OpenSSL::Crypto)
+    target_link_libraries(vdpm-channel PRIVATE OpenSSL::Crypto Threads::Threads)
     install(TARGETS vdpm-channel RUNTIME DESTINATION bin)
 endif()
 
