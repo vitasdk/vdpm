@@ -11,13 +11,11 @@ set -euo pipefail
 
 repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 temporary_root=$(mktemp -d "${TMPDIR:-/tmp}/vdpm-manifest.XXXXXXXX")
-host=$(uname -m)
-[[ $host == arm64 && $(uname -s) == Linux ]] && host=aarch64
-case $(uname -s) in
-	Darwin*) host="$host-apple-darwin" ;;
-	Linux*) host="$host-linux-gnu" ;;
-	*) printf 'unsupported test host\n' >&2; exit 1 ;;
-esac
+source "$repository_root/include/host-triplet.sh"
+host=$(vdpm_host_triplet) || {
+	printf 'unsupported test host\n' >&2
+	exit 1
+}
 
 cleanup() { rm -rf -- "$temporary_root"; }
 trap cleanup EXIT

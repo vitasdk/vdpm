@@ -88,14 +88,18 @@ detect_host_triplet() {
 	case $(uname -s) in
 		Darwin*) printf '%s-apple-darwin\n' "$architecture" ;;
 		Linux*)
-			if ldd --version 2>&1 | grep -qi musl; then
+			# Not a pipeline: musl's ldd exits 1, which pipefail reads as glibc.
+			local banner
+			banner=$(ldd --version 2>&1 || :)
+			if [[ $banner == *musl* ]] ||
+				[[ -z $banner && -e /lib/ld-musl-$architecture.so.1 ]]; then
 				printf '%s-linux-musl\n' "$architecture"
 			else
 				printf '%s-linux-gnu\n' "$architecture"
 			fi
 			;;
 		FreeBSD*) printf '%s-unknown-freebsd\n' "$architecture" ;;
-		MSYS*|MINGW*|CYGWIN*) printf '%s-w64-mingw32\n' "$architecture" ;;
+		MSYS*|MINGW64*|CYGWIN*) printf '%s-w64-mingw32\n' "$architecture" ;;
 		*) return 1 ;;
 	esac
 }
