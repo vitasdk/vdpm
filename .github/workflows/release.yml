@@ -69,7 +69,6 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
-      # Run once here rather than once per matrix leg.
       - name: Exercise the Windows installer under PowerShell
         if: matrix.host == 'x86_64-linux-gnu'
         shell: bash
@@ -78,6 +77,10 @@ jobs:
         if: matrix.host == 'x86_64-linux-gnu'
         shell: bash
         run: ./tests/test-bootstrap-root-install.sh
+      - uses: actions/cache@v6
+        with:
+          path: downloads
+          key: vdpm-downloads-${{ hashFiles('cmake/PackageClientVersions.cmake') }}
       - name: Build, bundle and validate inside ${{ matrix.image }}
         shell: bash
         env:
@@ -85,14 +88,15 @@ jobs:
           VDPM_HOST: ${{ matrix.host }}
           VDPM_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          mkdir -p release
+          mkdir -p release downloads
           docker run --rm \
             -v "$PWD":/src:ro \
             -v "$PWD/release":/release \
-            -v "$PWD/scripts/build-in-linux-container.sh":/build.sh:ro \
+            -v "$PWD/downloads":/downloads \
             -e SOURCE_DATE_EPOCH -e VDPM_HOST -e VDPM_VERSION \
-            -e VDPM_REVISION="$(git rev-parse HEAD)" \
-            '${{ matrix.image }}' /build.sh
+            -e VDPM_REVISION='${{ github.sha }}' \
+            -e VDPM_DOWNLOAD_DIR=/downloads \
+            '${{ matrix.image }}' /src/scripts/build-in-linux-container.sh
       - uses: actions/upload-artifact@v7
         with:
           name: vdpm-${{ matrix.host }}
@@ -107,46 +111,29 @@ jobs:
       matrix:
         include:
           - host: arm64-apple-darwin
-            toolchain: ''
-            validate_executables: '1'
+            runner: macos-15
           - host: x86_64-apple-darwin
-            toolchain: cmake/toolchains/macos-x86_64.cmake
-            # Cross-built; Rosetta may not be present to run it.
-            validate_executables: '0'
-    runs-on: macos-15
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
       - name: Install macOS build dependencies
         run: |
           brew install bash meson ninja pkg-config
           echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
-      - name: Build the complete product
-        shell: bash
-        run: |
-          toolchain_args=()
-          if [[ -n '${{ matrix.toolchain }}' ]]; then
-            toolchain_args=(-DCMAKE_TOOLCHAIN_FILE='${{ matrix.toolchain }}')
-          fi
-          cmake -S . -B build \
-            "${toolchain_args[@]}" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$PWD/stage" \
-            -DBUILD_VDPM_PACKAGE_CLIENT=ON \
-            -DBUILD_VDPM_CHANNEL=ON \
-            -DVDPM_PACKAGE_CLIENT_INSTALL_PREFIX="$PWD/stage"
-          cmake --build build --target install --parallel "$(sysctl -n hw.logicalcpu)"
-      - name: Create and validate release bundle
+      - uses: actions/cache@v6
+        with:
+          path: downloads
+          key: vdpm-downloads-${{ hashFiles('cmake/PackageClientVersions.cmake') }}
+      - name: Build, bundle and validate
         shell: bash
         env:
           SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
-        run: |
-          revision=$(git rev-parse HEAD)
-          scripts/create-release-bundle.sh \
-            "$PWD/stage" "$PWD/release" '${{ matrix.host }}' \
-            '${{ needs.prepare.outputs.version }}' "$revision"
-          VDPM_VALIDATE_EXECUTABLES='${{ matrix.validate_executables }}' \
-            scripts/validate-release-bundle.sh \
-            release/*.tar.bz2 '${{ matrix.host }}'
+          VDPM_HOST: ${{ matrix.host }}
+          VDPM_VERSION: ${{ needs.prepare.outputs.version }}
+          VDPM_REVISION: ${{ github.sha }}
+          VDPM_DOWNLOAD_DIR: ${{ github.workspace }}/downloads
+        run: scripts/build-and-bundle.sh . "$PWD"
       - uses: actions/upload-artifact@v7
         with:
           name: vdpm-${{ matrix.host }}
@@ -163,14 +150,12 @@ jobs:
         include:
           - host: x86_64-unknown-freebsd
             runner: ubuntu-24.04
+            arch: x86_64
             freebsd_arch_dir: amd64/amd64
-            freebsd_target: x86_64-unknown-freebsd14.3
-            toolchain: cmake/toolchains/freebsd-x86_64.cmake
           - host: aarch64-unknown-freebsd
             runner: ubuntu-24.04-arm
+            arch: aarch64
             freebsd_arch_dir: arm64/aarch64
-            freebsd_target: aarch64-unknown-freebsd14.3
-            toolchain: cmake/toolchains/freebsd-aarch64.cmake
     runs-on: ${{ matrix.runner }}
     env:
       FREEBSD_RELEASE: 14.3-RELEASE
@@ -195,38 +180,66 @@ jobs:
           # Only headers and libraries; the rest of base.txz goes unused.
           tar -xJf base.txz -C freebsd-sysroot ./usr/include ./usr/lib ./lib
           rm base.txz
-      - name: Build the complete product
-        shell: bash
-        env:
-          VDPM_FREEBSD_SYSROOT: ${{ github.workspace }}/freebsd-sysroot
-          VDPM_FREEBSD_TARGET: ${{ matrix.freebsd_target }}
-        run: |
-          cmake -S . -B build \
-            -DCMAKE_TOOLCHAIN_FILE='${{ matrix.toolchain }}' \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$PWD/stage" \
-            -DBUILD_VDPM_PACKAGE_CLIENT=ON \
-            -DBUILD_VDPM_CHANNEL=ON \
-            -DVDPM_PACKAGE_CLIENT_INSTALL_PREFIX="$PWD/stage"
-          cmake --build build --target install --parallel "$(nproc)"
-      - name: Create and validate release bundle
+          # The clang resource tree and most static archives never join the link.
+          rm -rf freebsd-sysroot/usr/lib/clang
+          find freebsd-sysroot/usr/lib -maxdepth 1 -name '*.a' \
+            ! -name 'libgcc*' ! -name 'libcompiler_rt*' -delete
+      - uses: actions/cache@v6
+        with:
+          path: downloads
+          key: vdpm-downloads-${{ hashFiles('cmake/PackageClientVersions.cmake') }}
+      - name: Build, bundle and validate
         shell: bash
         env:
           SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
+          VDPM_HOST: ${{ matrix.host }}
+          VDPM_VERSION: ${{ needs.prepare.outputs.version }}
+          VDPM_REVISION: ${{ github.sha }}
+          VDPM_DOWNLOAD_DIR: ${{ github.workspace }}/downloads
+          VDPM_FREEBSD_SYSROOT: ${{ github.workspace }}/freebsd-sysroot
+          VDPM_TOOLCHAIN: cmake/toolchains/freebsd.cmake
+          # The binaries run afterwards, in the smoke-freebsd VM job.
+          VDPM_VALIDATE_EXECUTABLES: '0'
         run: |
-          revision=$(git rev-parse HEAD)
-          scripts/create-release-bundle.sh \
-            "$PWD/stage" "$PWD/release" '${{ matrix.host }}' \
-            '${{ needs.prepare.outputs.version }}' "$revision"
-          # Cannot execute a FreeBSD binary on this Linux host.
-          scripts/validate-release-bundle.sh \
-            release/*.tar.bz2 '${{ matrix.host }}'
+          export VDPM_FREEBSD_TARGET="${{ matrix.arch }}-unknown-freebsd${FREEBSD_RELEASE%-RELEASE}"
+          scripts/build-and-bundle.sh . "$PWD"
       - uses: actions/upload-artifact@v7
         with:
           name: vdpm-${{ matrix.host }}
           path: release/*
           if-no-files-found: error
           retention-days: 14
+
+  smoke-freebsd:
+    needs: [prepare, build-freebsd]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: vdpm-x86_64-unknown-freebsd
+          path: release
+      - name: Execute the bundle on real FreeBSD
+        uses: cross-platform-actions/action@24ef01df165c76df1ed2b9f9e9212e78dc2fc963 # v1.4.0
+        with:
+          operating_system: freebsd
+          version: '14.3'
+          architecture: x86-64
+          run: |
+            sudo env ASSUME_ALWAYS_YES=YES pkg install -y bash
+            mkdir extracted
+            tar -xjf release/vdpm-*-x86_64-unknown-freebsd.tar.bz2 -C extracted
+            root=$(dirname "$(find extracted -type f -path '*/bin/vdpm' | head -n 1)")/..
+            "$root/bin/vdpm" --help
+            "$root/libexec/vdpm/pacman" --version
+            printf '[options]\nArchitecture = x86_64-unknown-freebsd vita\nSigLevel = Never\n[smoke]\nServer = https://vitasdk.org/channels\n' > pacman.conf
+            mkdir -p db
+            output=$("$root/libexec/vdpm/pacman" --config pacman.conf --dbpath "$PWD/db" -Syy 2>&1) || true
+            printf '%s\n' "$output"
+            case $output in
+              *certificate*|*SSL*) echo 'TLS trust is broken in the shipped libcurl' >&2; exit 1 ;;
+              *'failed retrieving file'*) ;;
+              *) echo 'unexpected pacman output' >&2; exit 1 ;;
+            esac
 
   build-windows:
     needs: prepare
@@ -289,10 +302,9 @@ jobs:
           # is relative to that root and moves with it.
           mkdir -p "$msys/ssl/certs"
           cp /usr/ssl/certs/ca-bundle.crt "$msys/ssl/certs/"
-          revision=$(git rev-parse HEAD)
           scripts/create-release-bundle.sh \
             "$stage" "$PWD/release" x86_64-w64-mingw32 \
-            '${{ needs.prepare.outputs.version }}' "$revision"
+            '${{ needs.prepare.outputs.version }}' '${{ github.sha }}'
           VDPM_VALIDATE_PE_IMPORTS=1 scripts/validate-release-bundle.sh \
             release/*.tar.bz2 x86_64-w64-mingw32
       - name: Exercise exact Windows bundle inputs
@@ -342,7 +354,7 @@ jobs:
           retention-days: 14
 
   collect:
-    needs: [prepare, build-linux-container, build-macos, build-freebsd, build-windows]
+    needs: [prepare, build-linux-container, build-macos, build-freebsd, smoke-freebsd, build-windows]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
