@@ -128,7 +128,9 @@ replaced rather than converted.
 ## Component releases
 
 `.github/workflows/release.yml` builds reproducible, host-specific product
-bundles for Linux x86_64, Linux aarch64, macOS arm64 and Windows x86_64. Every
+bundles for glibc Linux (x86_64, aarch64, built against glibc 2.31), musl
+Linux (x86_64, aarch64), macOS (arm64, x86_64), FreeBSD (x86_64, aarch64,
+cross-compiled and then executed in a FreeBSD VM) and Windows x86_64. Every
 bundle carries its source revision, complete third-party notices and license
 texts. Tags named `v*` are published first as a draft release; the workflow
 downloads and byte-compares all assets before making the release visible.
