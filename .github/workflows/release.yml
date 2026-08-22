@@ -232,8 +232,9 @@ jobs:
             "$root/bin/vdpm" --help
             "$root/libexec/vdpm/pacman" --version
             printf '[options]\nArchitecture = x86_64-unknown-freebsd vita\nSigLevel = Never\n[smoke]\nServer = https://vitasdk.org/channels\n' > pacman.conf
-            mkdir -p db
-            output=$("$root/libexec/vdpm/pacman" --config pacman.conf --dbpath "$PWD/db" -Syy 2>&1) || true
+            mkdir -p db rootdir
+            output=$("$root/libexec/vdpm/pacman" --config pacman.conf \
+              --root "$PWD/rootdir" --dbpath "$PWD/db" -Syy 2>&1) || true
             printf '%s\n' "$output"
             case $output in
               *certificate*|*SSL*) echo 'TLS trust is broken in the shipped libcurl' >&2; exit 1 ;;
