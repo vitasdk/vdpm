@@ -8,9 +8,9 @@ function(vdpm_add_package_client install_dir)
         message(FATAL_ERROR "The package-client build requires CMake 3.20 or newer")
     endif()
 
-    if(CMAKE_CROSSCOMPILING)
+    if(CMAKE_CROSSCOMPILING AND NOT APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
         message(FATAL_ERROR
-            "The CMake package-client build currently supports native Linux and macOS builds only; use tests/pacman/msys-pacman-build.sh under MSYS on Windows")
+            "The CMake package-client build currently supports native Linux, native macOS, cross to macOS and cross to FreeBSD; use tests/pacman/msys-pacman-build.sh under MSYS on Windows")
     endif()
 
     set(vdpm_source_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/..")
@@ -42,6 +42,13 @@ function(vdpm_add_package_client install_dir)
         -DCMAKE_INSTALL_PREFIX=${deps_dir}
         "-DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}"
         -DBUILD_SHARED_LIBS=OFF)
+    if(CMAKE_TOOLCHAIN_FILE)
+        # Each ExternalProject_Add below configures from scratch, so the
+        # outer cross-compilation setup has to be forwarded explicitly.
+        get_filename_component(vdpm_toolchain_file "${CMAKE_TOOLCHAIN_FILE}"
+            ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
+        list(APPEND common_cmake_args -DCMAKE_TOOLCHAIN_FILE=${vdpm_toolchain_file})
+    endif()
 
     ExternalProject_Add(zlib-pacman
         URL ${ZLIB_URL}
@@ -75,12 +82,37 @@ function(vdpm_add_package_client install_dir)
             -DXZ_DOC=OFF
         )
 
+    set(openssl_cross_args)
+    if(CMAKE_CROSSCOMPILING AND APPLE)
+        if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+            list(APPEND openssl_cross_args darwin64-x86_64-cc)
+        elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
+            list(APPEND openssl_cross_args darwin64-arm64-cc)
+        else()
+            message(FATAL_ERROR
+                "No OpenSSL cross target known for Apple ${CMAKE_SYSTEM_PROCESSOR}")
+        endif()
+        list(APPEND openssl_cross_args "CC=${CMAKE_C_COMPILER}")
+    elseif(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+        if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+            list(APPEND openssl_cross_args BSD-x86_64)
+        elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
+            list(APPEND openssl_cross_args BSD-aarch64)
+        else()
+            message(FATAL_ERROR
+                "No OpenSSL cross target known for FreeBSD ${CMAKE_SYSTEM_PROCESSOR}")
+        endif()
+        list(APPEND openssl_cross_args
+            "CC=${CMAKE_C_COMPILER}" "AR=${CMAKE_AR}" "RANLIB=${CMAKE_RANLIB}")
+    endif()
+
     ExternalProject_Add(openssl-pacman
         URL ${OPENSSL_URL}
         URL_HASH ${OPENSSL_HASH}
         DOWNLOAD_DIR ${VDPM_DOWNLOAD_DIR}
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
         CONFIGURE_COMMAND <SOURCE_DIR>/Configure
+            ${openssl_cross_args}
             --prefix=${deps_dir}
             --libdir=lib
             no-shared
@@ -180,6 +212,43 @@ function(vdpm_add_package_client install_dir)
     set(pacman_pkg_config_path
         "${deps_dir}/lib/pkgconfig:${deps_dir}/share/pkgconfig")
 
+    set(pacman_meson_args)
+    if(CMAKE_CROSSCOMPILING)
+        # Meson does not read the outer CMake toolchain; it needs its own
+        # cross file naming the same compiler and target triple.
+        if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+            set(meson_system darwin)
+        elseif(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+            set(meson_system freebsd)
+        else()
+            message(FATAL_ERROR
+                "No Meson cross mapping for CMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}")
+        endif()
+        if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
+            set(meson_cpu_family aarch64)
+        elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+            set(meson_cpu_family x86_64)
+        else()
+            message(FATAL_ERROR
+                "No Meson cross mapping for CMAKE_SYSTEM_PROCESSOR=${CMAKE_SYSTEM_PROCESSOR}")
+        endif()
+        set(pacman_cross_file "${CMAKE_BINARY_DIR}/pacman-meson-cross.ini")
+        file(WRITE "${pacman_cross_file}" "\
+[binaries]
+c = '${CMAKE_C_COMPILER}'
+ar = '${CMAKE_AR}'
+strip = '${CMAKE_STRIP}'
+pkg-config = 'pkg-config'
+
+[host_machine]
+system = '${meson_system}'
+cpu_family = '${meson_cpu_family}'
+cpu = '${meson_cpu_family}'
+endian = 'little'
+")
+        set(pacman_meson_args --cross-file=${pacman_cross_file})
+    endif()
+
     ExternalProject_Add(pacman-client
         DEPENDS libarchive-pacman curl-pacman openssl-pacman
         GIT_REPOSITORY ${PACMAN_REPOSITORY}
@@ -197,6 +266,7 @@ function(vdpm_add_package_client install_dir)
         CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
             "PKG_CONFIG_PATH=${pacman_pkg_config_path}"
             ${MESON_EXECUTABLE} setup <BINARY_DIR> <SOURCE_DIR>
+            ${pacman_meson_args}
             --buildtype=release
             --prefix=/
             -Dbuildstatic=true
