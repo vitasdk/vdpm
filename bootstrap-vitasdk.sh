@@ -158,14 +158,25 @@ if [[ -z $local_archive && ( -z $url || -z $expected_sha256 ) ]]; then
 			fi
 		else
 			url="https://github.com/vitasdk/vdpm/releases/download/$SEED_RELEASE/vdpm-$SEED_VERSION-$host.tar.bz2"
+			seed_url_generated=1
 		fi
 	fi
 
 	if [[ -z $expected_sha256 ]]; then
+		command -v curl >/dev/null || command -v wget >/dev/null || {
+			printf 'curl or wget is required to bootstrap VitaSDK\n' >&2
+			exit 1
+		}
 		sidecar_content=$(download_to_string "${url}.sha256" || true)
 		if [[ -n $sidecar_content ]]; then
 			expected_sha256=$(printf '%s' "$sidecar_content" | awk '{print $1}')
 		fi
+	fi
+
+	if [[ -z $expected_sha256 && -n ${seed_url_generated:-} ]]; then
+		printf 'no bootstrap seed is published for %s at %s\n' "$host" "$SEED_RELEASE" >&2
+		printf 'set VITASDK_SEED_ARCHIVE to a locally built bundle to proceed\n' >&2
+		exit 1
 	fi
 fi
 
