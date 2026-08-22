@@ -54,10 +54,8 @@ if(BUILD_VDPM_PACKAGE_CLIENT)
             -DOPENSSL_ROOT_DIR=${CMAKE_BINARY_DIR}/package-client-deps
             -DOPENSSL_USE_STATIC_LIBS=TRUE)
         if(CMAKE_TOOLCHAIN_FILE)
-            get_filename_component(vdpm_channel_toolchain_file
-                "${CMAKE_TOOLCHAIN_FILE}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
             list(APPEND vdpm_channel_cmake_args
-                -DCMAKE_TOOLCHAIN_FILE=${vdpm_channel_toolchain_file})
+                -DCMAKE_TOOLCHAIN_FILE=${vdpm_resolved_toolchain_file})
         endif()
         ExternalProject_Add(vdpm-channel-product
             DEPENDS openssl-pacman

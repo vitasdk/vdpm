@@ -11,10 +11,8 @@ for arg in "$@"; do
     esac
 done
 
-flags="--target=$VDPM_FREEBSD_TARGET --sysroot=$VDPM_FREEBSD_SYSROOT"
 if [ "$link" = 1 ]; then
-    flags="$flags -fuse-ld=lld"
+    set -- -fuse-ld=lld "$@"
 fi
-
-# shellcheck disable=SC2086
-exec clang $flags "$@"
+set -- "--target=$VDPM_FREEBSD_TARGET" "--sysroot=$VDPM_FREEBSD_SYSROOT" "$@"
+exec clang "$@"
