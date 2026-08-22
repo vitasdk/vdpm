@@ -47,7 +47,8 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "source_date_epoch=$(git show -s --format=%ct HEAD)" >> "$GITHUB_OUTPUT"
 
-  build-unix:
+  # glibc hosts build inside Ubuntu 20.04, musl hosts inside Alpine, to cap the libc version they need.
+  build-linux-container:
     needs: prepare
     strategy:
       fail-fast: false
@@ -55,48 +56,85 @@ jobs:
         include:
           - host: x86_64-linux-gnu
             runner: ubuntu-24.04
+            image: ubuntu:20.04
           - host: aarch64-linux-gnu
             runner: ubuntu-24.04-arm
-          - host: arm64-apple-darwin
-            runner: macos-15
+            image: ubuntu:20.04
+          - host: x86_64-linux-musl
+            runner: ubuntu-24.04
+            image: alpine:3.20
+          - host: aarch64-linux-musl
+            runner: ubuntu-24.04-arm
+            image: alpine:3.20
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
-      - name: Install Linux build dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake meson ninja-build pkg-config
-      - name: Install macOS build dependencies
-        if: runner.os == 'macOS'
-        run: |
-          brew install bash meson ninja pkg-config
-          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
+      # Run once here rather than once per matrix leg.
       - name: Exercise the Windows installer under PowerShell
         if: matrix.host == 'x86_64-linux-gnu'
         shell: bash
         run: ./tests/test-bootstrap-powershell.sh
-      # Needs a machine whose root it may write to, which is why nothing had
-      # ever installed into a top-level directory.
       - name: Install into a top-level directory
         if: matrix.host == 'x86_64-linux-gnu'
         shell: bash
         run: ./tests/test-bootstrap-root-install.sh
+      - name: Build, bundle and validate inside ${{ matrix.image }}
+        shell: bash
+        env:
+          SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
+          VDPM_HOST: ${{ matrix.host }}
+          VDPM_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          mkdir -p release
+          docker run --rm \
+            -v "$PWD":/src:ro \
+            -v "$PWD/release":/release \
+            -v "$PWD/scripts/build-in-linux-container.sh":/build.sh:ro \
+            -e SOURCE_DATE_EPOCH -e VDPM_HOST -e VDPM_VERSION \
+            -e VDPM_REVISION="$(git rev-parse HEAD)" \
+            '${{ matrix.image }}' /build.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vdpm-${{ matrix.host }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  build-macos:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: arm64-apple-darwin
+            toolchain: ''
+            validate_executables: '1'
+          - host: x86_64-apple-darwin
+            toolchain: cmake/toolchains/macos-x86_64.cmake
+            # Cross-built; Rosetta may not be present to run it.
+            validate_executables: '0'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install macOS build dependencies
+        run: |
+          brew install bash meson ninja pkg-config
+          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
       - name: Build the complete product
         shell: bash
         run: |
+          toolchain_args=()
+          if [[ -n '${{ matrix.toolchain }}' ]]; then
+            toolchain_args=(-DCMAKE_TOOLCHAIN_FILE='${{ matrix.toolchain }}')
+          fi
           cmake -S . -B build \
+            "${toolchain_args[@]}" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$PWD/stage" \
             -DBUILD_VDPM_PACKAGE_CLIENT=ON \
             -DBUILD_VDPM_CHANNEL=ON \
             -DVDPM_PACKAGE_CLIENT_INSTALL_PREFIX="$PWD/stage"
-          if [[ $RUNNER_OS == macOS ]]; then
-            jobs=$(sysctl -n hw.logicalcpu)
-          else
-            jobs=$(nproc)
-          fi
-          cmake --build build --target install --parallel "$jobs"
+          cmake --build build --target install --parallel "$(sysctl -n hw.logicalcpu)"
       - name: Create and validate release bundle
         shell: bash
         env:
@@ -106,7 +144,82 @@ jobs:
           scripts/create-release-bundle.sh \
             "$PWD/stage" "$PWD/release" '${{ matrix.host }}' \
             '${{ needs.prepare.outputs.version }}' "$revision"
-          VDPM_VALIDATE_EXECUTABLES=1 scripts/validate-release-bundle.sh \
+          VDPM_VALIDATE_EXECUTABLES='${{ matrix.validate_executables }}' \
+            scripts/validate-release-bundle.sh \
+            release/*.tar.bz2 '${{ matrix.host }}'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vdpm-${{ matrix.host }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  # No hosted FreeBSD runner exists; cross-compiles from Linux instead.
+  build-freebsd:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: x86_64-unknown-freebsd
+            runner: ubuntu-24.04
+            freebsd_arch_dir: amd64/amd64
+            freebsd_target: x86_64-unknown-freebsd14.3
+            toolchain: cmake/toolchains/freebsd-x86_64.cmake
+          - host: aarch64-unknown-freebsd
+            runner: ubuntu-24.04-arm
+            freebsd_arch_dir: arm64/aarch64
+            freebsd_target: aarch64-unknown-freebsd14.3
+            toolchain: cmake/toolchains/freebsd-aarch64.cmake
+    runs-on: ${{ matrix.runner }}
+    env:
+      FREEBSD_RELEASE: 14.3-RELEASE
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install cross build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake meson ninja-build pkg-config clang lld llvm
+      - name: Cache the FreeBSD sysroot
+        id: sysroot-cache
+        uses: actions/cache@v6
+        with:
+          path: freebsd-sysroot
+          key: freebsd-sysroot-${{ matrix.host }}-${{ env.FREEBSD_RELEASE }}
+      - name: Fetch FreeBSD base for the sysroot
+        if: steps.sysroot-cache.outputs.cache-hit != 'true'
+        run: |
+          curl --fail --location --silent --show-error -o base.txz \
+            "https://download.freebsd.org/releases/${{ matrix.freebsd_arch_dir }}/$FREEBSD_RELEASE/base.txz"
+          mkdir -p freebsd-sysroot
+          # Only headers and libraries; the rest of base.txz goes unused.
+          tar -xJf base.txz -C freebsd-sysroot ./usr/include ./usr/lib ./lib
+          rm base.txz
+      - name: Build the complete product
+        shell: bash
+        env:
+          VDPM_FREEBSD_SYSROOT: ${{ github.workspace }}/freebsd-sysroot
+          VDPM_FREEBSD_TARGET: ${{ matrix.freebsd_target }}
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_TOOLCHAIN_FILE='${{ matrix.toolchain }}' \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$PWD/stage" \
+            -DBUILD_VDPM_PACKAGE_CLIENT=ON \
+            -DBUILD_VDPM_CHANNEL=ON \
+            -DVDPM_PACKAGE_CLIENT_INSTALL_PREFIX="$PWD/stage"
+          cmake --build build --target install --parallel "$(nproc)"
+      - name: Create and validate release bundle
+        shell: bash
+        env:
+          SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
+        run: |
+          revision=$(git rev-parse HEAD)
+          scripts/create-release-bundle.sh \
+            "$PWD/stage" "$PWD/release" '${{ matrix.host }}' \
+            '${{ needs.prepare.outputs.version }}' "$revision"
+          # Cannot execute a FreeBSD binary on this Linux host.
+          scripts/validate-release-bundle.sh \
             release/*.tar.bz2 '${{ matrix.host }}'
       - uses: actions/upload-artifact@v7
         with:
@@ -229,7 +342,7 @@ jobs:
           retention-days: 14
 
   collect:
-    needs: [prepare, build-unix, build-windows]
+    needs: [prepare, build-linux-container, build-macos, build-freebsd, build-windows]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -245,7 +358,12 @@ jobs:
           expected=(
             x86_64-linux-gnu
             aarch64-linux-gnu
+            x86_64-linux-musl
+            aarch64-linux-musl
             arm64-apple-darwin
+            x86_64-apple-darwin
+            x86_64-unknown-freebsd
+            aarch64-unknown-freebsd
             x86_64-w64-mingw32
           )
           for host in "${expected[@]}"; do
