@@ -218,29 +218,31 @@ jobs:
         with:
           name: vdpm-x86_64-unknown-freebsd
           path: release
-      - name: Execute the bundle on real FreeBSD
+      - name: Start the FreeBSD VM
         uses: cross-platform-actions/action@24ef01df165c76df1ed2b9f9e9212e78dc2fc963 # v1.4.0
         with:
           operating_system: freebsd
           version: '14.3'
           architecture: x86-64
-          run: |
-            sudo env ASSUME_ALWAYS_YES=YES pkg install -y bash
-            mkdir extracted
-            tar -xjf release/vdpm-*-x86_64-unknown-freebsd.tar.bz2 -C extracted
-            root=$(dirname "$(find extracted -type f -path '*/bin/vdpm' | head -n 1)")/..
-            "$root/bin/vdpm" --help
-            "$root/libexec/vdpm/pacman" --version
-            printf '[options]\nArchitecture = x86_64-unknown-freebsd vita\nSigLevel = Never\n[smoke]\nServer = https://vitasdk.org/channels\n' > pacman.conf
-            mkdir -p db rootdir
-            output=$("$root/libexec/vdpm/pacman" --config pacman.conf \
-              --root "$PWD/rootdir" --dbpath "$PWD/db" -Syy 2>&1) || true
-            printf '%s\n' "$output"
-            case $output in
-              *certificate*|*SSL*) echo 'TLS trust is broken in the shipped libcurl' >&2; exit 1 ;;
-              *'failed retrieving file'*) ;;
-              *) echo 'unexpected pacman output' >&2; exit 1 ;;
-            esac
+      - name: Execute the bundle on real FreeBSD
+        shell: cpa.sh {0}
+        run: |
+          sudo env ASSUME_ALWAYS_YES=YES pkg install -y bash
+          mkdir extracted
+          tar -xjf release/vdpm-*-x86_64-unknown-freebsd.tar.bz2 -C extracted
+          root=$(dirname "$(find extracted -type f -path '*/bin/vdpm' | head -n 1)")/..
+          "$root/bin/vdpm" --help
+          "$root/libexec/vdpm/pacman" --version
+          printf '[options]\nArchitecture = x86_64-unknown-freebsd vita\nSigLevel = Never\n[smoke]\nServer = https://vitasdk.org/channels\n' > pacman.conf
+          mkdir -p db rootdir
+          output=$("$root/libexec/vdpm/pacman" --config pacman.conf \
+            --root "$PWD/rootdir" --dbpath "$PWD/db" -Syy 2>&1) || true
+          printf '%s\n' "$output"
+          case $output in
+            *certificate*|*SSL*) echo 'TLS trust is broken in the shipped libcurl' >&2; exit 1 ;;
+            *'failed retrieving file'*) ;;
+            *) echo 'unexpected pacman output' >&2; exit 1 ;;
+          esac
 
   build-windows:
     needs: prepare
