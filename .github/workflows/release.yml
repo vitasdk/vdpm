@@ -182,10 +182,18 @@ jobs:
           # Only headers and libraries; the rest of base.txz goes unused.
           tar -xJf base.txz -C freebsd-sysroot ./usr/include ./usr/lib ./lib
           rm base.txz
-          # The clang resource tree and most static archives never join the link.
+          # The clang resource tree and unreferenced static archives never join the link.
           rm -rf freebsd-sysroot/usr/lib/clang
           find freebsd-sysroot/usr/lib -maxdepth 1 -name '*.a' \
-            ! -name 'libgcc*' ! -name 'libcompiler_rt*' -delete
+            ! -name 'libgcc*' ! -name 'libcompiler_rt*' ! -name '*_nonshared*' -delete
+          # Some .so files are linker scripts; every archive they name must survive.
+          for script in freebsd-sysroot/usr/lib/*.so; do
+            [ -L "$script" ] && continue
+            head -c 4 "$script" | grep -q ELF && continue
+            for ref in $(grep -oE '/[^ )]+\.a' "$script"); do
+              test -e "freebsd-sysroot$ref"
+            done
+          done
       - uses: actions/cache@v6
         with:
           path: downloads
