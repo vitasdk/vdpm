@@ -371,6 +371,28 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # The Windows installer has been run for real against the published channels
+  # for a while; the shell one never was. Every smoke test hands it a local
+  # archive, which is the one path that skips the seed and the channel index,
+  # so a seed the installer could not accept shipped and broke every install.
+  smoke-bootstrap:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install from the published channels, as a new user would
+        shell: bash
+        run: |
+          docker run --rm -v "$PWD":/src:ro ubuntu:24.04 bash -euc '
+            apt-get update -qq >/dev/null
+            apt-get install -y -qq curl ca-certificates bzip2 tar >/dev/null
+            /src/bootstrap-vitasdk.sh
+            /usr/local/vitasdk/bin/vdpm --help >/dev/null
+            /usr/local/vitasdk/libexec/vdpm/pacman --version >/dev/null
+            /usr/local/vitasdk/bin/arm-vita-eabi-gcc --version
+            printf "int main(){return 0;}\n" > /tmp/probe.c
+            /usr/local/vitasdk/bin/arm-vita-eabi-gcc -c /tmp/probe.c -o /tmp/probe.o
+          '
+
   collect:
     needs: [prepare, build-linux-container, build-macos, build-freebsd, smoke-freebsd, build-windows]
     runs-on: ubuntu-24.04
