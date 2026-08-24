@@ -16,6 +16,7 @@ on:
       - bootstrap-vitasdk.sh
       - tests/test-bootstrap-powershell.sh
       - tests/test-bootstrap-root-install.sh
+      - tests/test-bootstrap-seed.sh
       - tests/test-bootstrap-windows.ps1
       - tests/test-release-bundle.sh
       - .github/workflows/release.yml
@@ -77,6 +78,10 @@ jobs:
         if: matrix.host == 'x86_64-linux-gnu'
         shell: bash
         run: ./tests/test-bootstrap-root-install.sh
+      - name: Check the seed release carries what the installers require
+        if: matrix.host == 'x86_64-linux-gnu'
+        shell: bash
+        run: ./tests/test-bootstrap-seed.sh
       - uses: actions/cache@v6
         with:
           path: downloads
