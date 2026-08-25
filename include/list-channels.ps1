@@ -17,7 +17,9 @@ if (-not $sdkRoot) {
 
 $channelTool = $env:VDPM_CHANNEL_TOOL
 if (-not $channelTool) {
-    $channelTool = Join-Path $sdkRoot "bin/vdpm-channel.exe"
+    # Where the Windows bootstrap installs it, which is not bin/:
+    # refresh-repositories.ps1 has always looked here.
+    $channelTool = Join-Path $sdkRoot "share/vdpm/msys/usr/bin/vdpm-channel.exe"
 }
 if (-not (Test-Path -LiteralPath $channelTool -PathType Leaf)) {
     throw "missing ${channelTool}"
