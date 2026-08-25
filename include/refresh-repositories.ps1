@@ -2,11 +2,19 @@ param(
     # Not a fixed list: a release series is a channel, so 2026.09 has to be
     # sayable. Still checked, because the name goes into a URL and a path.
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9._-]*$')]
-    [string]$Channel = "stable"
+    [string]$Channel = ""
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+
+# No default. Refresh is what moves somebody between series, and the name
+# this used to assume -- stable -- is not a series: it 404s. vdpm refuses
+# without one, and so does this, for whoever runs it by hand. A parameter
+# default skips ValidatePattern, which is why the check is here.
+if (-not $Channel) {
+    throw 'refresh requires a series; run `vdpm channels` to see them'
+}
 
 function Require-RegularFile([string]$Path, [string]$Description) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {

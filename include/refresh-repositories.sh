@@ -2,9 +2,14 @@
 
 set -euo pipefail
 
-# No argument means the default channel; an empty one is a mistake, and
-# quietly turning it into stable would move somebody off their release.
-channel=${1-stable}
+# No default. Refresh is what moves somebody between series, and the name
+# this used to assume -- stable -- is not a series: it 404s. vdpm refuses
+# without one, and so does this, for whoever runs it by hand.
+[[ $# -ge 1 ]] || {
+	printf 'refresh requires a series; run `vdpm channels` to see them\n' >&2
+	exit 1
+}
+channel=$1
 # A channel is a name, not a fixed list: a release series is a channel that
 # lives as long as the release does, so 2026.09 has to be sayable. It is
 # still checked, because the name goes into a URL and a file path.
