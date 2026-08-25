@@ -14,9 +14,12 @@ refresher="${directory}/include/refresh-repositories.sh"
 
 refused()
 {
-    # Everything past the name check fails for unrelated reasons here, so
+    # By its shebang, the way vdpm spawns it. Under `sh` this says
+    # "Illegal option -o pipefail" wherever /bin/sh is dash, and then
+    # nothing is ever refused and every check below passes for nothing.
+    # Everything past the name check fails here for unrelated reasons, so
     # what is asserted is only whether the name itself was refused.
-    VITASDK= sh "${refresher}" "$1" 2>&1 | grep -q 'invalid channel name'
+    VITASDK= "${refresher}" "$1" 2>&1 | grep -q 'invalid channel name'
 }
 
 failures=0
@@ -36,6 +39,17 @@ for name in '../nightly' 'a/b' '' '-x' '.hidden' 'a..b' 'x;y' 'a b' 'a$b'; do
         failures=$((failures + 1))
     fi
 done
+
+# No series at all is not a name at all. Refresh is what moves somebody
+# between series, and the name this used to default to -- stable -- is not
+# one: it 404s. The way out is the same one vdpm names.
+if VITASDK= "${refresher}" >/dev/null 2>&1; then
+    echo "ran a refresh without being told which series" >&2
+    failures=$((failures + 1))
+elif ! VITASDK= "${refresher}" 2>&1 | grep -q 'run `vdpm channels`'; then
+    echo "refused a missing series without saying how to find one" >&2
+    failures=$((failures + 1))
+fi
 
 [ "${failures}" -eq 0 ] || exit 1
 echo "channel names OK"
