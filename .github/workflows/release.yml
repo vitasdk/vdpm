@@ -19,6 +19,8 @@ on:
       - tests/test-channel-names.sh
       - tests/test-bootstrap-root-install.sh
       - tests/test-bootstrap-seed.sh
+      - tests/test-stamp-seed.sh
+      - scripts/stamp-seed.sh
       - tests/test-bootstrap-windows.ps1
       - tests/test-host-triplet.sh
       - tests/test-release-bundle.sh
@@ -97,6 +99,10 @@ jobs:
         if: matrix.host == 'x86_64-linux-gnu'
         shell: bash
         run: ./tests/test-bootstrap-seed.sh
+      - name: Check a release can stamp its own seed pin
+        if: matrix.host == 'x86_64-linux-gnu'
+        shell: bash
+        run: ./tests/test-stamp-seed.sh
       - uses: actions/cache@v6
         with:
           path: downloads
@@ -418,6 +424,25 @@ jobs:
           pattern: vdpm-*
           path: release
           merge-multiple: true
+      # A release seeds from itself. The pin in the tree is what somebody
+      # running the installer out of a git checkout gets, so it names the
+      # newest published release and is a real answer; what goes out with a
+      # release names that release, because the seeds are in it. Nothing is
+      # left to remember: the pin used to be a constant somebody had to bump,
+      # and it sat three releases behind until a musl host tripped over it.
+      #
+      # Safe because the release below is a transaction: created as a draft,
+      # every asset uploaded, downloaded back and compared, and only then
+      # published. Nobody can fetch the installer before its seeds exist.
+      # Only when a tag is being cut. Every other run of this job exists to
+      # prove the release set still builds, and there is no release for those
+      # to seed from -- a pull request's ref name is <number>/merge, which is
+      # not a tag and would not be a pin.
+      - name: Seed this release from itself
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: scripts/stamp-seed.sh "$GITHUB_REF_NAME" '${{ needs.prepare.outputs.version }}'
+
       - name: Verify complete release set
         shell: bash
         run: |

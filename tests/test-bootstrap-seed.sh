@@ -78,4 +78,39 @@ check_bundle() {
 check_bundle x86_64-linux-gnu "$posix_requirements"
 check_bundle x86_64-w64-mingw32 "$windows_requirements"
 
+# The seed has to agree with the installer about what a host is, not only
+# carry the right files. It re-detects the host itself -- vdpm refresh runs
+# from the seed -- so a seed whose detection is older than the installer's
+# installs a package set for a host nobody asked for. That is how a musl host
+# came to bootstrap a glibc SDK that cannot execute: the installer detected
+# musl, downloaded the musl seed, and the seed said gnu.
+check_detection() {
+	local host=$1 archive extracted
+	archive="$temporary_directory/vdpm-$seed_version-$host.tar.bz2"
+	extracted="$temporary_directory/extracted-$host"
+	mkdir -p "$extracted"
+	tar -xjf "$archive" -C "$extracted"
+	local seed_detection="$extracted/vdpm-$seed_version-$host/bin/include/host-triplet.sh"
+	[[ -f $seed_detection ]] || {
+		printf 'seed %s for %s carries no host-triplet.sh\n' "$seed_release" "$host" >&2
+		exit 1
+	}
+	# Compared by what they do, not byte for byte: comments and formatting are
+	# allowed to differ, the set of triplets either can answer is not.
+	local ours theirs
+	ours=$(grep -oE "'%s-[a-z0-9_-]+" "$repository_root/include/host-triplet.sh" | sort -u)
+	theirs=$(grep -oE "'%s-[a-z0-9_-]+" "$seed_detection" | sort -u)
+	[[ $ours == "$theirs" ]] || {
+		printf 'seed %s detects different hosts from this tree.\n' "$seed_release" >&2
+		printf '  this tree: %s\n' "$(tr '\n' ' ' <<< "$ours")" >&2
+		printf '  the seed:  %s\n' "$(tr '\n' ' ' <<< "$theirs")" >&2
+		printf 'Bump the seed pin, or the installer will hand work to a seed that\n' >&2
+		printf 'resolves the host differently from the way it was resolved here.\n' >&2
+		exit 1
+	}
+	printf 'seed %s resolves hosts the way this tree does\n' "$seed_release"
+}
+
+check_detection x86_64-linux-gnu
+
 printf 'bootstrap seed contract tests passed\n'
