@@ -19,6 +19,8 @@ on:
       - tests/test-channel-names.sh
       - tests/test-bootstrap-root-install.sh
       - tests/test-bootstrap-seed.sh
+      - tests/test-stamp-seed.sh
+      - scripts/stamp-seed.sh
       - tests/test-bootstrap-windows.ps1
       - tests/test-host-triplet.sh
       - tests/test-release-bundle.sh
@@ -97,6 +99,10 @@ jobs:
         if: matrix.host == 'x86_64-linux-gnu'
         shell: bash
         run: ./tests/test-bootstrap-seed.sh
+      - name: Check a release can stamp its own seed pin
+        if: matrix.host == 'x86_64-linux-gnu'
+        shell: bash
+        run: ./tests/test-stamp-seed.sh
       - uses: actions/cache@v6
         with:
           path: downloads
@@ -428,18 +434,14 @@ jobs:
       # Safe because the release below is a transaction: created as a draft,
       # every asset uploaded, downloaded back and compared, and only then
       # published. Nobody can fetch the installer before its seeds exist.
+      # Only when a tag is being cut. Every other run of this job exists to
+      # prove the release set still builds, and there is no release for those
+      # to seed from -- a pull request's ref name is <number>/merge, which is
+      # not a tag and would not be a pin.
       - name: Seed this release from itself
+        if: startsWith(github.ref, 'refs/tags/')
         shell: bash
-        env:
-          VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          tag=$GITHUB_REF_NAME
-          sed -i "s/^SEED_RELEASE=.*/SEED_RELEASE=$tag/; s/^SEED_VERSION=.*/SEED_VERSION=$VERSION/" \
-            bootstrap-vitasdk.sh
-          sed -i "s/^\$SeedRelease = .*/\$SeedRelease = '$tag'/; s/^\$SeedVersion = .*/\$SeedVersion = '$VERSION'/" \
-            bootstrap-vitasdk.ps1
-          grep -H '^SEED_RELEASE=\|^SEED_VERSION=' bootstrap-vitasdk.sh
-          grep -H 'SeedRelease\|SeedVersion' bootstrap-vitasdk.ps1
+        run: scripts/stamp-seed.sh "$GITHUB_REF_NAME" '${{ needs.prepare.outputs.version }}'
 
       - name: Verify complete release set
         shell: bash
