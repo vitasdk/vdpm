@@ -28,8 +28,8 @@ EOF
 #
 # What the network is never allowed to decide is which verifier to trust: the
 # manifest that says what to install is checked with the key already on disk.
-SEED_RELEASE=v0.1.2
-SEED_VERSION=0.1.2
+SEED_RELEASE=v0.1.4
+SEED_VERSION=0.1.4
 CHANNEL_KEY_SHA256=c02df2e12216f6f633d94206634bbe8f244d74f610b29e922d7ea8bab2efb307
 
 install_from_packages=0

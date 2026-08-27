@@ -418,6 +418,29 @@ jobs:
           pattern: vdpm-*
           path: release
           merge-multiple: true
+      # A release seeds from itself. The pin in the tree is what somebody
+      # running the installer out of a git checkout gets, so it names the
+      # newest published release and is a real answer; what goes out with a
+      # release names that release, because the seeds are in it. Nothing is
+      # left to remember: the pin used to be a constant somebody had to bump,
+      # and it sat three releases behind until a musl host tripped over it.
+      #
+      # Safe because the release below is a transaction: created as a draft,
+      # every asset uploaded, downloaded back and compared, and only then
+      # published. Nobody can fetch the installer before its seeds exist.
+      - name: Seed this release from itself
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          tag=$GITHUB_REF_NAME
+          sed -i "s/^SEED_RELEASE=.*/SEED_RELEASE=$tag/; s/^SEED_VERSION=.*/SEED_VERSION=$VERSION/" \
+            bootstrap-vitasdk.sh
+          sed -i "s/^\$SeedRelease = .*/\$SeedRelease = '$tag'/; s/^\$SeedVersion = .*/\$SeedVersion = '$VERSION'/" \
+            bootstrap-vitasdk.ps1
+          grep -H '^SEED_RELEASE=\|^SEED_VERSION=' bootstrap-vitasdk.sh
+          grep -H 'SeedRelease\|SeedVersion' bootstrap-vitasdk.ps1
+
       - name: Verify complete release set
         shell: bash
         run: |
