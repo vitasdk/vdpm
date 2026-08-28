@@ -22,8 +22,8 @@ if (Test-Path $InstallDirectory) {
 # script the root instead of them; that is a deliberate choice. The key digest
 # below is checked anyway, because it catches a seed that brings a different
 # channel key.
-$SeedRelease = 'v0.1.5'
-$SeedVersion = '0.1.5'
+$SeedRelease = 'v0.1.6'
+$SeedVersion = '0.1.6'
 $ChannelKeySha256 = 'c02df2e12216f6f633d94206634bbe8f244d74f610b29e922d7ea8bab2efb307'
 # The world somebody gets when they do not ask for one. A world decides the
 # ABI of everything the toolchain compiles, so it is never picked for them.
