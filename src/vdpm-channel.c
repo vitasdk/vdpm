@@ -836,9 +836,11 @@ static int command_series(const char *path)
 	for (member = channels->members; member; member = member->next) {
 		const char *status = string_of(member->value, "status");
 		const char *summary = string_of(member->value, "summary");
+		const char *world = string_of(member->value, "world");
 
-		printf("%s\t%s\t%s\n", member->key, status ? status : "unknown",
-		       summary ? summary : "");
+		printf("%s\t%s\t%s\t%s\n", member->key,
+		       status ? status : "unknown", summary ? summary : "",
+		       world ? world : DEFAULT_WORLD);
 	}
 	node_free(root);
 	return 0;

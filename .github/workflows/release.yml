@@ -24,6 +24,7 @@ on:
       - tests/test-bootstrap-windows.ps1
       - tests/test-host-triplet.sh
       - tests/test-refresh-worlds.sh
+      - tests/test-channel-worlds-listing.sh
       - tests/test-release-bundle.sh
       - .github/workflows/release.yml
   push:

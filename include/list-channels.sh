@@ -59,11 +59,25 @@ fi
 mkdir -p "$VITASDK/var/lib/vdpm"
 cp "$index" "$VITASDK/var/lib/vdpm/index.json"
 
-printf '%-14s %-14s %s\n' 'RELEASE' 'STATUS' 'SUMMARY'
-while IFS=$'\t' read -r name status summary; do
+# The world column appears only once there is more than one, so the listing
+# everybody already reads does not grow a column saying the only answer.
+rows=$("$channel_tool" series "$index")
+worlds=$(cut -f4 <<< "$rows" | sort -u | wc -l)
+
+if (( worlds > 1 )); then
+	printf '%-14s %-14s %-14s %s\n' 'RELEASE' 'STATUS' 'WORLD' 'SUMMARY'
+else
+	printf '%-14s %-14s %s\n' 'RELEASE' 'STATUS' 'SUMMARY'
+fi
+while IFS=$'\t' read -r name status summary world; do
 	marker=' '
 	[[ $name == "$current" ]] && marker='*'
-	printf '%s%-13s %-14s %s\n' "$marker" "$name" "$status" "$summary"
-done < <("$channel_tool" series "$index")
+	if (( worlds > 1 )); then
+		printf '%s%-13s %-14s %-14s %s\n' \
+			"$marker" "$name" "$status" "$world" "$summary"
+	else
+		printf '%s%-13s %-14s %s\n' "$marker" "$name" "$status" "$summary"
+	fi
+done <<< "$rows"
 
 [[ -z $current ]] || printf '\n* is the release this installation follows.\n'
