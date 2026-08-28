@@ -67,15 +67,35 @@ try {
     New-Item -ItemType Directory -Path $stateDirectory -Force | Out-Null
     Copy-Item -LiteralPath $index -Destination (Join-Path $stateDirectory "index.json") -Force
 
-    "{0,-14} {1,-14} {2}" -f "RELEASE", "STATUS", "SUMMARY"
+    $rows = @()
     foreach ($line in @(& $channelTool series $index)) {
-        $parts = $line -split "`t", 3
+        $parts = $line -split "`t", 4
         if ($parts.Length -lt 2) { continue }
+        $rows += ,@{
+            Name = $parts[0]
+            Status = $parts[1]
+            Summary = $(if ($parts.Length -ge 3) { $parts[2] } else { "" })
+            World = $(if ($parts.Length -ge 4) { $parts[3] } else { "" })
+        }
+    }
+    # The world column appears only once there is more than one, so the
+    # listing everybody already reads does not grow a column saying the only
+    # answer.
+    $manyWorlds = (@($rows | ForEach-Object { $_.World } | Sort-Object -Unique)).Count -gt 1
+    if ($manyWorlds) {
+        "{0,-14} {1,-14} {2,-14} {3}" -f "RELEASE", "STATUS", "WORLD", "SUMMARY"
+    } else {
+        "{0,-14} {1,-14} {2}" -f "RELEASE", "STATUS", "SUMMARY"
+    }
+    foreach ($row in $rows) {
         $marker = " "
-        if ($parts[0] -eq $current) { $marker = "*" }
-        $summary = ""
-        if ($parts.Length -ge 3) { $summary = $parts[2] }
-        "{0}{1,-13} {2,-14} {3}" -f $marker, $parts[0], $parts[1], $summary
+        if ($row.Name -eq $current) { $marker = "*" }
+        if ($manyWorlds) {
+            "{0}{1,-13} {2,-14} {3,-14} {4}" -f `
+                $marker, $row.Name, $row.Status, $row.World, $row.Summary
+        } else {
+            "{0}{1,-13} {2,-14} {3}" -f $marker, $row.Name, $row.Status, $row.Summary
+        }
     }
     if ($current) {
         ""

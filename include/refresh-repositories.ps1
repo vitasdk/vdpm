@@ -137,15 +137,35 @@ try {
         throw "package repository database SHA-256 mismatch"
     }
 
+    # The world and the repository come from the manifest that was just
+    # verified, not from here. See the shell installer for why.
+    $world = Manifest-Field "world"
+    $repository = $vitaName -replace '\.db$', ''
+
+    $configurationPath = Join-Path (Join-Path $sdkRoot "etc") "pacman.conf"
+    if (Test-Path -LiteralPath $configurationPath) {
+        # A configuration with no world after the host predates worlds and is
+        # not a mismatch; only a different one is.
+        $match = Select-String -LiteralPath $configurationPath `
+            -Pattern '^Architecture = \S+ (\S+)\s*$' | Select-Object -First 1
+        if ($match) {
+            $installed = $match.Matches[0].Groups[1].Value
+            if ($installed -ne $world) {
+                throw ("this installation is $installed and channel $Channel is $world; " +
+                       "changing world needs a new VITASDK root, not a refresh")
+            }
+        }
+    }
+
     $configuration = Join-Path $temporaryRoot "pacman.conf"
     $lines = @(
         "[options]",
-        "Architecture = $hostTriplet vita",
+        "Architecture = $hostTriplet $world",
         "# vdpm verifies signed channel metadata and the selected database hash before use.",
         "SigLevel = Never",
         "[$hostTriplet]",
         "Server = $(Manifest-Field 'core.server')",
-        "[vita]",
+        "[$repository]",
         "Server = $(Manifest-Field 'packages.server')"
     )
     [IO.File]::WriteAllText($configuration, ($lines -join "`n") + "`n",
@@ -158,7 +178,7 @@ try {
         New-Item -ItemType Directory -Force -Path $_ | Out-Null
     }
     Install-File $coreDatabase (Join-Path $syncRoot "${hostTriplet}.db")
-    Install-File $vitaDatabase (Join-Path $syncRoot "vita.db")
+    Install-File $vitaDatabase (Join-Path $syncRoot $vitaName)
     # Staged, not selected: the transaction that moves the toolchain runs
     # after this, and until it succeeds the installation is still on the
     # series whose compiler it actually has.

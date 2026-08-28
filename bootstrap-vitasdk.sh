@@ -31,6 +31,9 @@ EOF
 SEED_RELEASE=v0.1.5
 SEED_VERSION=0.1.5
 CHANNEL_KEY_SHA256=c02df2e12216f6f633d94206634bbe8f244d74f610b29e922d7ea8bab2efb307
+# The world somebody gets when they do not ask for one. A world decides the
+# ABI of everything the toolchain compiles, so it is never picked for them.
+DEFAULT_WORLD=vita
 
 install_from_packages=0
 resolve_series=0
@@ -325,10 +328,26 @@ if (( resolve_series )) && [[ -z $channel || $channel == stable ]]; then
 	}
 	# Series are named YYYY.MM, so the newest one is the highest year and
 	# then the highest month.
-	channel=$(grep -o '"[^"]*":{"status":"supported"' "$index" | cut -d'"' -f2 |
+	#
+	# Only within the default world. A second world's series is named after
+	# the same month -- 2026.11-softfp against 2026.11 -- and sorting by
+	# YYYY.MM cannot tell them apart, so whoever asked for no world in
+	# particular could have been handed one that changes the ABI of
+	# everything they compile. Asking for it by name still works: this runs
+	# only when nobody named a series.
+	#
+	# The helper doing the reading is the seed's, which may predate worlds
+	# and print three fields instead of four. A seed that cannot say is
+	# treated as saying the default, which is what it meant: no series of a
+	# second world is ever marked supported before a seed that can tell
+	# them apart is the one being pinned here.
+	channel=$("$staging_directory/$channel_tool" series "$index" |
+		awk -F'\t' -v world="$DEFAULT_WORLD" \
+			'$2 == "supported" && ($4 == "" ? world : $4) == world { print $1 }' |
 		sort -t. -k1,1nr -k2,2nr | head -n1)
 	[[ -n $channel ]] || {
-		printf 'the release index lists no supported series\n' >&2
+		printf 'the release index lists no supported series for %s\n' \
+			"$DEFAULT_WORLD" >&2
 		exit 1
 	}
 	printf 'Installing the supported series %s\n' "$channel" >&2

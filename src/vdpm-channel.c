@@ -455,12 +455,18 @@ static int check_section(const struct node *section, const char **error)
 	return 1;
 }
 
+/* The world a version 1 manifest is for when it does not say. It is the only
+ * world that existed while version 1 was the current schema, so a manifest
+ * written then can only have meant this one. Version 2 has to say. */
+#define DEFAULT_WORLD "vita"
+
 struct manifest {
 	struct node *root;
 	const struct node *core;
 	const struct node *packages;
 	const struct node *core_database;
 	const struct node *packages_database;
+	const char *world;
 };
 
 static int check_manifest(struct manifest *manifest, const char *channel,
@@ -471,11 +477,25 @@ static int check_manifest(struct manifest *manifest, const char *channel,
 	const struct node *sequence = lookup(root, "sequence");
 	const struct node *architectures;
 	const struct node *host_entry;
+	const struct node *world;
 	const char *declared;
 
 	if (!schema_version || schema_version->type != NODE_INTEGER ||
-	    schema_version->integer != 1) {
+	    (schema_version->integer != 1 && schema_version->integer != 2)) {
 		*error = "unsupported manifest schema version";
+		return 0;
+	}
+	world = lookup(root, "world");
+	if (world) {
+		if (world->type != NODE_STRING || world->text[0] == '\0') {
+			*error = "manifest names an invalid world";
+			return 0;
+		}
+		manifest->world = world->text;
+	} else if (schema_version->integer == 1) {
+		manifest->world = DEFAULT_WORLD;
+	} else {
+		*error = "manifest names no world";
 		return 0;
 	}
 	declared = string_of(root, "channel");
@@ -670,6 +690,10 @@ static int command_field(const struct manifest *manifest, const char *field)
 		printf("%llu\n", sequence->integer);
 		return 0;
 	}
+	if (strcmp(field, "world") == 0) {
+		printf("%s\n", manifest->world);
+		return 0;
+	}
 	if (strcmp(field, "core.database.name") == 0) {
 		printf("%s\n", string_of(manifest->core_database, "name"));
 		return 0;
@@ -812,9 +836,11 @@ static int command_series(const char *path)
 	for (member = channels->members; member; member = member->next) {
 		const char *status = string_of(member->value, "status");
 		const char *summary = string_of(member->value, "summary");
+		const char *world = string_of(member->value, "world");
 
-		printf("%s\t%s\t%s\n", member->key, status ? status : "unknown",
-		       summary ? summary : "");
+		printf("%s\t%s\t%s\t%s\n", member->key,
+		       status ? status : "unknown", summary ? summary : "",
+		       world ? world : DEFAULT_WORLD);
 	}
 	node_free(root);
 	return 0;

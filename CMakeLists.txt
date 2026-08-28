@@ -86,4 +86,13 @@ if(BUILD_TESTING AND UNIX)
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-bootstrap.sh")
     add_test(NAME vdpm-host-triplet-contract
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-host-triplet.sh")
+    add_test(NAME vdpm-refresh-worlds
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-refresh-worlds.sh")
+    set_tests_properties(vdpm-refresh-worlds PROPERTIES SKIP_RETURN_CODE 77)
+    add_test(NAME vdpm-channel-worlds-listing
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-channel-worlds-listing.sh")
+    set_tests_properties(vdpm-channel-worlds-listing PROPERTIES SKIP_RETURN_CODE 77)
+    add_test(NAME vdpm-series-autoselection
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-series-autoselection.sh")
+    set_tests_properties(vdpm-series-autoselection PROPERTIES SKIP_RETURN_CODE 77)
 endif()
