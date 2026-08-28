@@ -86,4 +86,7 @@ if(BUILD_TESTING AND UNIX)
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-bootstrap.sh")
     add_test(NAME vdpm-host-triplet-contract
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-host-triplet.sh")
+    add_test(NAME vdpm-refresh-worlds
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-refresh-worlds.sh")
+    set_tests_properties(vdpm-refresh-worlds PROPERTIES SKIP_RETURN_CODE 77)
 endif()
