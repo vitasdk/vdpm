@@ -98,29 +98,48 @@ download_database() {
 	fi
 }
 
+# The world and the repository come from the manifest that was just verified,
+# not from here. This used to say vita in three places, which was right while
+# that was the only world and wrong for the first package of the second.
+world=$(value world)
+packages_database_name=$(value packages.database.name)
+repository=${packages_database_name%.db}
+
 core_database="$temporary_directory/$host.db"
-vita_database="$temporary_directory/vita.db"
+vita_database="$temporary_directory/$packages_database_name"
 download_database "$(value core.database.url)" \
 	"$(value core.database.name)" "$core_database"
 download_database "$(value packages.database.url)" \
-	"$(value packages.database.name)" "$vita_database"
+	"$packages_database_name" "$vita_database"
 verify_hash "$(value core.database.sha256)" "$core_database"
 verify_hash "$(value packages.database.sha256)" "$vita_database"
+
+# Changing the world under an installation would leave a sysroot of one ABI
+# with a package database of another, and pacman cannot tell them apart by
+# file name. A new world is a new root.
+installed_world=$(sed -n 's/^Architecture = [^ ]* //p' \
+	"$VITASDK/etc/pacman.conf" 2>/dev/null || true)
+[[ -z $installed_world || $installed_world == "$world" ]] || {
+	printf 'this installation is %s and channel %s is %s\n' \
+		"$installed_world" "$channel" "$world" >&2
+	printf 'changing world needs a new VITASDK root, not a refresh\n' >&2
+	exit 1
+}
 
 mkdir -p "$VITASDK/etc" "$VITASDK/var/lib/pacman/sync" "$VITASDK/var/lib/vdpm"
 configuration="$temporary_directory/pacman.conf"
 cat > "$configuration" <<EOF
 [options]
-Architecture = $host vita
+Architecture = $host $world
 # vdpm verifies signed channel metadata and the selected database hash before use.
 SigLevel = Never
 [$host]
 Server = $(value core.server)
-[vita]
+[$repository]
 Server = $(value packages.server)
 EOF
 cp "$core_database" "$VITASDK/var/lib/pacman/sync/$host.db"
-cp "$vita_database" "$VITASDK/var/lib/pacman/sync/vita.db"
+cp "$vita_database" "$VITASDK/var/lib/pacman/sync/$packages_database_name"
 mv "$configuration" "$VITASDK/etc/pacman.conf"
 
 # The selection is staged, not made. Moving between series is a package

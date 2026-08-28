@@ -134,7 +134,7 @@ reject_replaced 'escape sequence in a string' '"release":"r"' '"release":"\u0072
 
 # --- schema and value constraints ------------------------------------------
 
-reject_replaced 'unsupported schema version' '"schema_version":1' '"schema_version":2'
+reject_replaced 'unsupported schema version' '"schema_version":1' '"schema_version":3'
 reject_replaced 'zero channel sequence' '"sequence":7' '"sequence":0'
 reject_replaced 'short database digest' "$packages_digest" 'abc'
 reject_replaced 'uppercase database digest' "$packages_digest" "$(printf 'A%.0s' {1..64})"
@@ -184,6 +184,33 @@ if "$tool" verify "$manifest" "$signature" "$temporary_root/rsa-public.pem" >/de
 	printf 'non-Ed25519 public key was unexpectedly accepted\n' >&2
 	exit 1
 fi
+
+# --- worlds -----------------------------------------------------------------
+
+# A version 1 manifest predates worlds, so one that does not name a world can
+# only have meant the world that existed then. A version 2 manifest has to say,
+# which is what stops an old client from installing a second world as the first.
+world_file="$temporary_root/world.json"
+world_of() {
+	"$tool" field "$1" nightly "$host" world
+}
+
+printf '%s\n' "$minimal" > "$world_file"
+test "$(world_of "$world_file")" = vita
+
+named=${minimal%\}},\"world\":\"vita_softfp\"}
+printf '%s\n' "$named" > "$world_file"
+expect_accepted "$world_file"
+test "$(world_of "$world_file")" = vita_softfp
+
+two=${named/\"schema_version\":1/\"schema_version\":2}
+printf '%s\n' "$two" > "$world_file"
+expect_accepted "$world_file"
+test "$(world_of "$world_file")" = vita_softfp
+
+reject_replaced 'version 2 without a world' '"schema_version":1' '"schema_version":2'
+reject_replaced 'empty world' '"sequence":7' '"sequence":7,"world":""'
+reject_replaced 'world that is not a string' '"sequence":7' '"sequence":7,"world":7'
 
 # --- digests ----------------------------------------------------------------
 
