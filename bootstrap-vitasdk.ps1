@@ -25,6 +25,9 @@ if (Test-Path $InstallDirectory) {
 $SeedRelease = 'v0.1.5'
 $SeedVersion = '0.1.5'
 $ChannelKeySha256 = 'c02df2e12216f6f633d94206634bbe8f244d74f610b29e922d7ea8bab2efb307'
+# The world somebody gets when they do not ask for one. A world decides the
+# ABI of everything the toolchain compiles, so it is never picked for them.
+$DefaultWorld = 'vita'
 $installFromPackages = $false
 
 if ($ArchivePath -and -not $Sha256 -and (Test-Path "${ArchivePath}.sha256")) {
@@ -195,12 +198,22 @@ try {
                 throw "the release index is not signed by the expected key"
             }
             $index = Get-Content $indexPath -Raw | ConvertFrom-Json
+            # Only within the default world. A second world's series is named
+            # after the same month -- 2026.11-softfp against 2026.11 -- and
+            # this sorts names as text, so the longer one wins and whoever
+            # asked for no world in particular gets the one that changes the
+            # ABI of everything they compile. Asking by name still works:
+            # this runs only when nobody named a series.
             $Channel = $index.channels.PSObject.Properties |
-                Where-Object { $_.Value.status -eq "supported" } |
+                Where-Object {
+                    $_.Value.status -eq "supported" -and
+                    ($(if ($_.Value.PSObject.Properties['world']) {
+                        $_.Value.world } else { $DefaultWorld })) -eq $DefaultWorld
+                } |
                 Sort-Object -Property Name -Descending |
                 Select-Object -First 1 -ExpandProperty Name
             if (-not $Channel) {
-                throw "the release index lists no supported series"
+                throw "the release index lists no supported series for $DefaultWorld"
             }
             Write-Host "Installing the supported series $Channel"
         }

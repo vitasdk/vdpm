@@ -9,10 +9,24 @@ trap cleanup EXIT
 
 archive_root="$temporary_directory/archive/vitasdk"
 mkdir -p "$archive_root/bin/include" "$archive_root/libexec/vdpm" "$archive_root/etc"
-for executable in vdpm-channel arm-vita-eabi-gcc; do
-	printf '#!/usr/bin/env sh\nexit 0\n' > "$archive_root/bin/$executable"
-	chmod +x "$archive_root/bin/$executable"
-done
+printf '#!/usr/bin/env sh\nexit 0\n' > "$archive_root/bin/arm-vita-eabi-gcc"
+chmod +x "$archive_root/bin/arm-vita-eabi-gcc"
+# The seed's channel helper. It verifies nothing here, but it does answer
+# `series`, because a seed that could not would not be able to run
+# `vdpm channels` either -- and the bootstrap reads the index through it
+# rather than by pattern-matching JSON.
+cat > "$archive_root/bin/vdpm-channel" <<'CHANNEL'
+#!/usr/bin/env sh
+[ "$1" = series ] || exit 0
+python3 - "$2" <<'PYEOF'
+import json, sys
+index = json.load(open(sys.argv[1]))
+for name, entry in index["channels"].items():
+    print("\t".join((name, entry.get("status", "unknown"),
+                     entry.get("summary", ""), entry.get("world", "vita"))))
+PYEOF
+CHANNEL
+chmod +x "$archive_root/bin/vdpm-channel"
 printf '#!/usr/bin/env sh\nexit 0\n' > "$archive_root/libexec/vdpm/pacman"
 chmod +x "$archive_root/libexec/vdpm/pacman"
 # Records what it was asked to do, so the test can tell whether the bootstrap

@@ -25,6 +25,7 @@ on:
       - tests/test-host-triplet.sh
       - tests/test-refresh-worlds.sh
       - tests/test-channel-worlds-listing.sh
+      - tests/test-series-autoselection.sh
       - tests/test-release-bundle.sh
       - .github/workflows/release.yml
   push:
