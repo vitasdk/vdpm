@@ -206,7 +206,7 @@ jobs:
         if: steps.sysroot-cache.outputs.cache-hit != 'true'
         run: |
           curl --fail --location --silent --show-error -o base.txz \
-            "https://download.freebsd.org/releases/${{ matrix.freebsd_arch_dir }}/$FREEBSD_RELEASE/base.txz"
+            "https://archive.freebsd.org/old-releases/${{ matrix.freebsd_arch_dir }}/$FREEBSD_RELEASE/base.txz"
           mkdir -p freebsd-sysroot
           # Only headers and libraries; the rest of base.txz goes unused.
           tar -xJf base.txz -C freebsd-sysroot ./usr/include ./usr/lib ./lib
