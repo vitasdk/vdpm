@@ -10,13 +10,25 @@ if [ -z "$VITASDK" ]; then
   exit 1
 fi
 
-. "$DIR/include/install-vitasdk.sh"
 . "$DIR/include/install-packages.sh"
 
-echo "==> Updating vitasdk"
-install_vitasdk $VITASDK
+# The archives an SDK from before the package client was updated from are no
+# longer built, and its file list cannot be handed to pacman, so there is
+# nothing to update it to in place.
+if ! package_client; then
+  echo "$VITASDK predates the package client and cannot be updated in place."
+  echo "Install a new SDK with ./bootstrap-vitasdk.sh into another directory."
+  exit 1
+fi
 
-echo "==> Updating packages"
-install_packages
+# Updating is a package transaction now: the toolchain and every installed
+# library are packages of the release this SDK follows, and unpacking a newer
+# archive over them -- what this used to do -- would leave pacman describing
+# files that are no longer there. Moving to another release is deliberately a
+# separate command, so that an update never changes the series.
+echo "==> Updating vitasdk and packages"
+update_release || { restore_archive_files; exit 1; }
+keep_archive_files_aside
 
 echo "All done!"
+echo "To move to another release, run: vdpm channels, then vdpm refresh <release>"
