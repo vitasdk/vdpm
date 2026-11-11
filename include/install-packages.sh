@@ -110,6 +110,7 @@ PACKAGES=(
 	sdl3
 	sdl3_image
 	sdl3_ttf
+	libtiff
 )
 
 b() {
