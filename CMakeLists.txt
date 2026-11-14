@@ -71,6 +71,8 @@ endif()
 if(BUILD_TESTING AND UNIX)
     add_test(NAME vdpm-frontend-contract
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-vdpm.sh")
+    add_test(NAME vdpm-legacy-entry-points
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-legacy-entry-points.sh")
     add_test(NAME vdpm-channel-manifest-contract
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/test-channel-manifest.sh")
     add_test(NAME vdpm-release-bundle-contract

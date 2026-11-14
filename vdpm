@@ -1,27 +1,13 @@
 #!/usr/bin/env bash
 
+# The vdpm in a checkout, and the one CI scripts download from master, is not
+# the client: the client is the one the SDK installed. This used to be a second
+# implementation of it, which looked for pacman where no SDK puts it and failed
+# for everybody who ran it -- including ./install-all.sh straight after a
+# bootstrap. Handing over keeps one implementation, and on an SDK that predates
+# the package client it hands over to the vdpm that SDK shipped.
+
 set -euo pipefail
-
-usage() {
-	cat <<'EOF'
-VitaSDK package manager
-
-Usage:
-  vdpm install [--force] PACKAGE...
-  vdpm remove PACKAGE...
-  vdpm upgrade [PACKAGE...]
-  vdpm list [PACKAGE...]
-  vdpm search TERM...
-  vdpm info PACKAGE...
-  vdpm files PACKAGE...
-  vdpm refresh SERIES
-
-Compatibility:
-  vdpm PACKAGE...       Same as `vdpm install PACKAGE...`
-  vdpm -f PACKAGE...    Reinstall packages
-  vdpm -u PACKAGE...    Remove packages
-EOF
-}
 
 die() {
 	printf 'vdpm: %s\n' "$*" >&2
@@ -29,108 +15,16 @@ die() {
 }
 
 [[ -n ${VITASDK:-} && $VITASDK == /* && $VITASDK != / ]] ||
-	die 'VITASDK must be an absolute, non-root path'
+	die 'VITASDK must be an absolute, non-root path, such as: export VITASDK=/usr/local/vitasdk'
 VITASDK=${VITASDK%/}
 
-pacman=${VDPM_PACMAN:-$VITASDK/bin/pacman}
-configuration=${VDPM_PACMAN_CONF:-$VITASDK/etc/pacman.conf}
-script_directory=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+client=$VITASDK/bin/vdpm
+self=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")
 
-[[ -x $pacman ]] || die "package client is not executable: $pacman"
-[[ -r $configuration ]] || die "package configuration is not readable: $configuration"
+[[ -x $client ]] || die "no VitaSDK at $VITASDK; install one with
+  curl -fsSL https://github.com/vitasdk/vdpm/releases/latest/download/bootstrap-vitasdk.sh | bash
+or ./bootstrap-vitasdk.sh from a vdpm checkout"
+[[ ! $client -ef $self ]] ||
+	die "$client is this script, not a package client; reinstall with ./bootstrap-vitasdk.sh"
 
-mkdir -p "$VITASDK/var/lib/pacman" "$VITASDK/var/cache/pacman/pkg" \
-	"$VITASDK/var/log"
-
-common_arguments=(
-	--config "$configuration"
-	--root "$VITASDK"
-	--dbpath "$VITASDK/var/lib/pacman"
-	--cachedir "$VITASDK/var/cache/pacman/pkg"
-	--logfile "$VITASDK/var/log/pacman.log"
-)
-run_pacman() {
-	"$pacman" "${common_arguments[@]}" "$@"
-}
-
-transaction_arguments=(--noscriptlet)
-if [[ ${VDPM_NONINTERACTIVE:-0} == 1 ]]; then
-	transaction_arguments+=(--noconfirm --noprogressbar)
-fi
-
-(( $# > 0 )) || {
-	usage
-	exit 2
-}
-
-force=0
-case $1 in
-	-h|--help)
-		usage
-		exit 0
-		;;
-	-f)
-		force=1
-		shift
-		command=install
-		;;
-	-u)
-		shift
-		command=remove
-		;;
-	install|remove|upgrade|list|search|info|files|refresh)
-		command=$1
-		shift
-		;;
-	*)
-		command=install
-		;;
-esac
-
-if [[ ${1:-} == --force ]]; then
-	[[ $command == install ]] || die '--force is valid only with install'
-	force=1
-	shift
-fi
-
-case $command in
-	install)
-		(( $# > 0 )) || die 'install requires at least one package'
-		install_arguments=(--sync)
-		(( force )) || install_arguments+=(--needed)
-		run_pacman "${transaction_arguments[@]}" "${install_arguments[@]}" "$@"
-		;;
-	remove)
-		(( $# > 0 )) || die 'remove requires at least one package'
-		run_pacman "${transaction_arguments[@]}" --remove "$@"
-		;;
-	upgrade)
-		if (( $# > 0 )); then
-			run_pacman "${transaction_arguments[@]}" --sync "$@"
-		else
-			run_pacman "${transaction_arguments[@]}" --sync --sysupgrade
-		fi
-		;;
-	list)
-		run_pacman --query "$@"
-		;;
-	search)
-		(( $# > 0 )) || die 'search requires a term'
-		run_pacman --sync --search "$@"
-		;;
-	info)
-		(( $# > 0 )) || die 'info requires at least one package'
-		run_pacman --sync --info "$@"
-		;;
-	files)
-		(( $# > 0 )) || die 'files requires at least one package'
-		run_pacman --query --list "$@"
-		;;
-	refresh)
-		(( $# <= 1 )) || die 'refresh accepts at most one series'
-		# No default. Refresh is the command that moves somebody between
-		# series, and the name it used to assume -- stable -- is not a series.
-		(( $# == 1 )) || die 'refresh requires a series; run `vdpm channels` to see them'
-		"$script_directory/include/refresh-repositories.sh" "$1"
-		;;
-esac
+exec "$client" "$@"

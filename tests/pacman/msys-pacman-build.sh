@@ -118,15 +118,18 @@ printf '  %s\n' "${imports[@]}"
 for import in "${imports[@]}"; do
 	case ${import,,} in
 		msys-2.0.dll|crypt32.dll|kernel32.dll) ;;
+		xmllite.dll) ;; # libarchive 3.8.10-2 in MSYS2 links it
 		*)
 			printf 'unexpected pacman runtime import: %s\n' "$import" >&2
 			exit 1
 			;;
 	esac
 done
-(( ${#imports[@]} == 3 )) || {
-	printf 'pacman runtime import set is incomplete\n' >&2
-	exit 1
-}
+for required in msys-2.0.dll crypt32.dll kernel32.dll; do
+	printf '%s\n' "${imports[@],,}" | grep -qx "$required" || {
+		printf 'pacman runtime import set is incomplete: %s\n' "$required" >&2
+		exit 1
+	}
+done
 
 printf 'built patched pacman 7.1.0 and the signed-channel helper with one MSYS runtime DLL\n'
