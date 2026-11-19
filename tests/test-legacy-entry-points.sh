@@ -61,8 +61,17 @@ case $1 in
 				[[ -n ${FAKE_OPENSSL_CONFLICT:-} ]] || exit 1 ;;
 			*'--sync --needed'*)
 				[[ -z ${FAKE_INSTALL_FAILS:-} ]] || exit 1
+				if [[ -n ${FAKE_REFUSE_UNOWNED_ZLIB:-} ]] &&
+					{ [[ -e $VITASDK/arm-vita-eabi/lib/libz.a ]] ||
+					  [[ -e $VITASDK/arm-vita-eabi/include/zlib.h ]]; }; then
+					exit 1
+				fi
 				if [[ -n ${FAKE_INSTALL_REPLACES:-} ]]; then
 					printf 'installed by pacman\n' > "$VITASDK/arm-vita-eabi/lib/libz.a"
+				fi
+				if [[ -n ${FAKE_INSTALL_ZLIB:-} ]]; then
+					printf 'installed by pacman\n' > "$VITASDK/arm-vita-eabi/lib/libz.a"
+					printf 'installed by pacman\n' > "$VITASDK/arm-vita-eabi/include/zlib.h"
 				fi ;;
 		esac
 		;;
@@ -206,6 +215,41 @@ cmp -s "$archives/zlib/lib/libz.a" "$fixture/arm-vita-eabi/lib/libz.a" ||
 	fail 'successful refresh lost unregistered zlib'
 [[ -f $fixture/etc/vdpm/packages.list && ! -e $fixture/etc/vdpm/packages.list.adopted ]] ||
 	fail 'successful refresh retired a still-needed legacy list'
+
+
+# A legacy archive can be temporarily unavailable or corrupt. Refresh should
+# still succeed without dropping packages.list: that list is what allows a
+# later install-all to move aside the unowned files when the archive returns.
+for state in missing corrupt; do
+	fixture="$temporary_root/archive-$state"
+	make_archive_fixture "$fixture"
+	archive_source="$temporary_root/source-$state"
+	mkdir -p "$archive_source"
+	if [[ $state == corrupt ]]; then
+		printf 'not an xz archive\n' > "$archive_source/zlib.tar.xz"
+	fi
+	VDPM_ARCHIVE_URL="file://$archive_source" VITASDK="$fixture" \
+		"$repository_root/vitasdk-update" >/dev/null 2>&1 ||
+		fail "update failed on an $state archive"
+	[[ -f $fixture/etc/vdpm/packages.list &&
+		! -e $fixture/etc/vdpm/packages.list.adopted ]] ||
+		fail "update retired packages.list despite an $state archive"
+	cmp -s "$archives/zlib/lib/libz.a" "$fixture/arm-vita-eabi/lib/libz.a" ||
+		fail "update altered unowned zlib with an $state archive"
+
+	# Real pacman rejects paths still owned by no package. The test client
+	# models that check, then installs zlib after migration clears the paths.
+	VDPM_ARCHIVE_URL="file://$archives" FAKE_REFUSE_UNOWNED_ZLIB=1 FAKE_INSTALL_ZLIB=1 \
+		VITASDK="$fixture" "$repository_root/install-all.sh" >/dev/null 2>&1 ||
+		fail "install-all could not recover after the $state archive returned"
+	[[ ! -e $fixture/etc/vdpm/packages.list &&
+		-f $fixture/etc/vdpm/packages.list.adopted ]] ||
+		fail "install-all did not adopt the recovered $state archive"
+	[[ $(cat "$fixture/arm-vita-eabi/lib/libz.a") == 'installed by pacman' ]] ||
+		fail "install-all did not install recovered zlib after $state"
+	[[ $(cat "$fixture/arm-vita-eabi/include/zlib.h") == 'installed by pacman' ]] ||
+		fail "install-all did not install recovered zlib headers after $state"
+done
 
 # A successful but incomplete transaction must likewise restore the originals.
 fixture="$temporary_root/install-no-replacement"

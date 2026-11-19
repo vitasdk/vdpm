@@ -160,8 +160,16 @@ set_aside_archive_files() {
 	for name in $(sed -n 's/^PACKAGE //p' "$list"); do
 		rm -rf "$work/archive"
 		mkdir "$work/archive"
-		curl -fsSL "$archives/$name.tar.xz" |
-			tar -xJf - -C "$work/archive" 2>/dev/null || continue
+		# A missing or corrupt archive cannot be used to decide that its
+		# unowned files have been adopted. Remember that inspection failed
+		# and leave packages.list available for a later retry.
+		if ! (set -o pipefail
+			curl -fsSL "$archives/$name.tar.xz" |
+				tar -xJf - -C "$work/archive" 2>/dev/null); then
+			archive_files_unchecked=1
+			printf 'Could not inspect legacy archive %s; keeping packages.list for a retry\n' "$name" >&2
+			continue
+		fi
 		(cd "$work/archive" && find . -type f) | sed 's#^\./##' | LC_ALL=C sort |
 			sed "s#^#$sysroot/#" | LC_ALL=C comm -23 - "$work/owned" |
 			while IFS= read -r file; do
@@ -197,10 +205,10 @@ restore_unreplaced_archive_files() {
 	fi
 }
 
-# Do not retire the legacy package list while any of its files are still
-# present as unowned archives: a later install-all may still need to adopt them.
+# Do not retire the legacy package list if an archive could not be checked
+# or its files were restored: a later install-all may still need to adopt them.
 keep_archive_files_aside() {
-	[[ -z ${archive_files_unreplaced:-} ]] || return 0
+	[[ -z ${archive_files_unreplaced:-} && -z ${archive_files_unchecked:-} ]] || return 0
 	[[ ! -f $VITASDK/etc/vdpm/packages.list ]] ||
 		mv "$VITASDK/etc/vdpm/packages.list" "$VITASDK/etc/vdpm/packages.list.adopted"
 }
