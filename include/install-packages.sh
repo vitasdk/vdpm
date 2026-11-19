@@ -141,21 +141,30 @@ transaction() {
 # where it is: pacman then refuses the package that would replace it, and
 # names the file.
 set_aside_archive_files() {
-	local list=$VITASDK/etc/vdpm/packages.list sysroot=$VITASDK/arm-vita-eabi
+	local sdkroot=$VITASDK
+	while [[ $sdkroot == */ && $sdkroot != / ]]; do sdkroot=${sdkroot%/}; done
+	local list=$sdkroot/etc/vdpm/packages.list sysroot=$sdkroot/arm-vita-eabi
 	[[ -f $list ]] || return 0
 	local archives=${VDPM_ARCHIVE_URL:-https://github.com/vitasdk/packages/releases/download/master}
 	local work backup name file moved
 	work=$(mktemp -d "${TMPDIR:-/tmp}/vdpm-archives.XXXXXXXX")
-	backup=$VITASDK/var/lib/vdpm/archive-files.$(date +%Y%m%d%H%M%S)
-	$DIR/../vdpm pacman -- --query --list 2>/dev/null | awk '{ print $2 }' | sort > "$work/owned"
+	backup=$sdkroot/var/lib/vdpm/archive-files.$(date +%Y%m%d%H%M%S)
+	# Quiet emits full paths, including spaces; a failed ownership query must
+	# never be mistaken for an empty list of package-owned files.
+	if ! "$DIR/../vdpm" pacman -- --query --list --quiet > "$work/owned"; then
+		printf 'cannot determine package-owned files; refusing legacy archive migration\n' >&2
+		rm -rf "$work"
+		return 1
+	fi
+	LC_ALL=C sort -o "$work/owned" "$work/owned"
 	for name in $(sed -n 's/^PACKAGE //p' "$list"); do
 		rm -rf "$work/archive"
 		mkdir "$work/archive"
 		curl -fsSL "$archives/$name.tar.xz" |
 			tar -xJf - -C "$work/archive" 2>/dev/null || continue
-		(cd "$work/archive" && find . -type f) | sed 's#^\./##' | sort |
-			sed "s#^#$sysroot/#" | comm -23 - "$work/owned" |
-			while read -r file; do
+		(cd "$work/archive" && find . -type f) | sed 's#^\./##' | LC_ALL=C sort |
+			sed "s#^#$sysroot/#" | LC_ALL=C comm -23 - "$work/owned" |
+			while IFS= read -r file; do
 				[[ -f $file ]] && cmp -s "$work/archive/${file#"$sysroot"/}" "$file" || continue
 				mkdir -p "$backup/$(dirname "${file#"$sysroot"/}")"
 				mv "$file" "$backup/${file#"$sysroot"/}"
@@ -169,28 +178,40 @@ set_aside_archive_files() {
 	fi
 }
 
-# The packages now own those paths; what the archive vdpm recorded no longer
-# describes anything, and the set-aside copies stay where they were put.
+# A refresh upgrades registered packages; it may not install an archive-only
+# library. Restore every staged file the transaction did not replace, even
+# when that transaction succeeded.
+restore_unreplaced_archive_files() {
+	[[ -n ${archive_backup:-} && -d $archive_backup ]] || return 0
+	local file restored=0
+	while IFS= read -r file; do
+		file=${file#./}
+		[[ -e $VITASDK/arm-vita-eabi/$file ]] && continue
+		mkdir -p "$VITASDK/arm-vita-eabi/$(dirname "$file")"
+		mv "$archive_backup/$file" "$VITASDK/arm-vita-eabi/$file"
+		restored=$((restored + 1))
+	done < <(cd "$archive_backup" && find . -type f)
+	if (( restored > 0 )); then
+		archive_files_unreplaced=1
+		printf '==> Restored %d legacy archive files not replaced by packages; keeping packages.list\n' "$restored" >&2
+	fi
+}
+
+# Do not retire the legacy package list while any of its files are still
+# present as unowned archives: a later install-all may still need to adopt them.
 keep_archive_files_aside() {
+	[[ -z ${archive_files_unreplaced:-} ]] || return 0
 	[[ ! -f $VITASDK/etc/vdpm/packages.list ]] ||
 		mv "$VITASDK/etc/vdpm/packages.list" "$VITASDK/etc/vdpm/packages.list.adopted"
 }
 
-# A transaction that failed -- usually on a file of somebody else's that a
-# package would replace -- must not leave the SDK with fewer libraries than it
-# had, so the set-aside files go back. Not over a path a package has meanwhile
-# installed: that one stays aside.
+# A failed transaction must put staged files back, without overwriting paths
+# which a package installed before the failure.
 restore_archive_files() {
 	[[ -n ${archive_backup:-} && -d $archive_backup ]] || return 0
-	local file
-	(cd "$archive_backup" && find . -type f) | sed 's#^\./##' |
-		while read -r file; do
-			[[ -e $VITASDK/arm-vita-eabi/$file ]] && continue
-			mkdir -p "$VITASDK/arm-vita-eabi/$(dirname "$file")"
-			mv "$archive_backup/$file" "$VITASDK/arm-vita-eabi/$file"
-		done
-	find "$archive_backup" -type d -empty -delete 2>/dev/null
-	printf 'Nothing was installed, and the files set aside are back in place.\n' >&2
+	restore_unreplaced_archive_files
+	find "$archive_backup" -type d -empty -delete 2>/dev/null || true
+	printf 'Files set aside have been restored where no package replaced them.\n' >&2
 	printf 'If pacman named a file above that exists in filesystem, it is not the one\n' >&2
 	printf 'VitaSDK shipped -- it may be yours. Move it out of %s and run this again.\n' \
 		"$VITASDK/arm-vita-eabi" >&2
@@ -206,11 +227,19 @@ newest_supported_release() {
 		sort -t. -k1,1nr -k2,2nr | head -n1
 }
 
+# Only the known OpenSSL 1.0.2 -> 1.1.1 replacement justifies retrying a
+# verified, staged refresh transaction with pacman's conflict answer enabled.
+openssl_replacement_needed() {
+	"$DIR/../vdpm" pacman -- --query --info openssl >/dev/null 2>&1 &&
+		! "$DIR/../vdpm" pacman -- --query --info openssl-1.1.1 >/dev/null 2>&1 &&
+		"$DIR/../vdpm" pacman -- --sync --info openssl-1.1.1 >/dev/null 2>&1
+}
+
 # Brings the SDK to the current packages of the release it follows. upgrade
 # alone cannot: it works from the databases the last refresh selected, which
 # for an SDK installed weeks ago name the packages of weeks ago.
 update_release() {
-	local release
+	local release staged="$VITASDK/var/lib/vdpm/channel.json.staged"
 	release=$($DIR/../vdpm status 2>/dev/null | awk '$1 == "Release" { print $2 }')
 	if [[ -z $release ]]; then
 		# Unpacked from an archive rather than bootstrapped -- how CI that
@@ -223,14 +252,16 @@ update_release() {
 		}
 		echo "==> This SDK follows no release; selecting $release"
 	fi
-	set_aside_archive_files
+	set_aside_archive_files || return 1
 	echo "==> Updating to the current packages of $release"
-	$DIR/../vdpm refresh "$release" && return 0
-	# Refresh selects the new databases before its transaction, so a
-	# transaction that only failed on a conflict can be finished here, and
-	# refreshing again then records the release as selected.
+	# Previous failures may leave a staged marker. Only one freshly produced
+	# by this refresh proves the new manifest and databases were verified.
+	rm -f "$staged"
+	"$DIR/../vdpm" refresh "$release" && return 0
+	[[ -f $staged ]] || return 1
+	openssl_replacement_needed || return 1
 	transaction --sync --sysupgrade --sysupgrade &&
-		$DIR/../vdpm refresh "$release"
+		"$DIR/../vdpm" refresh "$release"
 }
 
 # The archive packages name OpenSSL 1.0.2 openssl, and their curl is built
@@ -289,5 +320,6 @@ install_packages() {
 	(( ${#missing[@]} == 0 )) ||
 		printf 'Skipping, not in this release: %s\n' "${missing[*]}" >&2
 	transaction --sync --needed "${wanted[@]}" || { restore_archive_files; return 1; }
+	restore_unreplaced_archive_files
 	keep_archive_files_aside
 }

@@ -28,6 +28,7 @@ fi
 # separate command, so that an update never changes the series.
 echo "==> Updating vitasdk and packages"
 update_release || { restore_archive_files; exit 1; }
+restore_unreplaced_archive_files
 keep_archive_files_aside
 
 echo "All done!"
