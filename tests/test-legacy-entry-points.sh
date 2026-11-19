@@ -1,0 +1,385 @@
+#!/usr/bin/env bash
+
+# The scripts at the top of the checkout are how VitaSDK was installed before
+# there was a package client, and they are still what people run after cloning
+# and what CI downloads from master. None of them was tested, and all three
+# broke without anybody here noticing.
+
+set -euo pipefail
+
+repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
+temporary_root=$(mktemp -d "${TMPDIR:-/tmp}/vdpm-legacy.XXXXXXXX")
+log="$temporary_root/log"
+
+cleanup() {
+	rm -rf -- "$temporary_root"
+}
+trap cleanup EXIT
+
+fail() {
+	printf '%s\n' "$*" >&2
+	exit 1
+}
+
+# What install-all asks for, as the package repository names it.
+listed=$(sed -n '/^PACKAGES=(/,/^)/{/^PACKAGES=(/d;/^)/d;s/^[[:space:]]*//;p;}' \
+	"$repository_root/include/install-packages.sh")
+catalogue="$temporary_root/catalogue"
+for package in $listed; do
+	case $package in
+		cpython) ;;
+		openssl) printf 'vita/openssl 1.0.2-1\nvita/openssl-1.1.1 1.1.1-2\n' ;;
+		*) printf 'vita/%s 1-1\n    description\n' "$package" ;;
+	esac
+done > "$catalogue"
+head -n 60 "$catalogue" > "$temporary_root/partial-catalogue"
+
+# A package-client SDK whose vdpm records what it was asked. It follows
+# FAKE_RELEASE, offers FAKE_CATALOGUE, and its first refresh fails when
+# FAKE_REFRESH_FAILS is set, the way a refresh does on a conflict.
+make_packaged_sdk() {
+	local root=$1
+
+	mkdir -p "$root/bin" "$root/libexec/vdpm"
+	: > "$root/libexec/vdpm/pacman"
+	chmod +x "$root/libexec/vdpm/pacman"
+	cat > "$root/bin/vdpm" <<'EOF'
+#!/usr/bin/env bash
+printf '%s %s\n' "${VDPM_NONINTERACTIVE:-unset}" "$*" >> "$VDPM_TEST_LOG"
+case $1 in
+	status) [[ -z ${FAKE_RELEASE-2026.08} ]] || printf 'Release   %s\n' "${FAKE_RELEASE-2026.08}" ;;
+	search) cat "$FAKE_CATALOGUE" ;;
+	pacman)
+		case $* in
+			*'--query --list --quiet'*)
+				[[ -z ${FAKE_QUERY_FAILS:-} ]] || exit 1
+				cat "${FAKE_OWNED:-/dev/null}" ;;
+			*'--query --info openssl-1.1.1'*) exit 1 ;;
+			*'--query --info openssl'*)
+				[[ -n ${FAKE_OPENSSL_CONFLICT:-} ]] || exit 1 ;;
+			*'--sync --info openssl-1.1.1'*)
+				[[ -n ${FAKE_OPENSSL_CONFLICT:-} ]] || exit 1 ;;
+			*'--sync --needed'*)
+				[[ -z ${FAKE_INSTALL_FAILS:-} ]] || exit 1
+				if [[ -n ${FAKE_REFUSE_UNOWNED_ZLIB:-} ]] &&
+					{ [[ -e $VITASDK/arm-vita-eabi/lib/libz.a ]] ||
+					  [[ -e $VITASDK/arm-vita-eabi/include/zlib.h ]]; }; then
+					exit 1
+				fi
+				if [[ -n ${FAKE_INSTALL_REPLACES:-} ]]; then
+					printf 'installed by pacman\n' > "$VITASDK/arm-vita-eabi/lib/libz.a"
+				fi
+				if [[ -n ${FAKE_INSTALL_ZLIB:-} ]]; then
+					printf 'installed by pacman\n' > "$VITASDK/arm-vita-eabi/lib/libz.a"
+					printf 'installed by pacman\n' > "$VITASDK/arm-vita-eabi/include/zlib.h"
+				fi ;;
+		esac
+		;;
+	channels)
+		printf 'RELEASE        STATUS         SUMMARY\n'
+		printf ' 2026.02       supported      Older.\n'
+		printf '*2026.08       supported      Most homebrew.\n'
+		printf ' 2026.08-softfp supported     Soft-float.\n'
+		printf ' nightly       development    Moves.\n'
+		;;
+	refresh)
+		[[ -z ${FAKE_REFRESH_PRESTAGE_FAILS:-} ]] || exit 1
+		mkdir -p "$VITASDK/var/lib/vdpm"
+		: > "$VITASDK/var/lib/vdpm/channel.json.staged"
+		if [[ -n ${FAKE_REFRESH_FAILS:-} && ! -e $VITASDK/refreshed-once ]]; then
+			touch "$VITASDK/refreshed-once"
+			exit 1
+		fi
+		rm -f "$VITASDK/var/lib/vdpm/channel.json.staged"
+		;;
+esac
+EOF
+	chmod +x "$root/bin/vdpm"
+}
+
+# An SDK from before the package client: its vdpm only installs archives.
+make_legacy_sdk() {
+	local root=$1
+
+	mkdir -p "$root/bin"
+	cat > "$root/bin/vdpm" <<'EOF'
+#!/usr/bin/env bash
+printf '%s %s\n' "${VDPM_NONINTERACTIVE:-unset}" "$*" >> "$VDPM_TEST_LOG"
+EOF
+	chmod +x "$root/bin/vdpm"
+}
+
+packaged="$temporary_root/packaged"
+make_packaged_sdk "$packaged"
+legacy="$temporary_root/legacy"
+make_legacy_sdk "$legacy"
+
+export VDPM_TEST_LOG="$log" FAKE_CATALOGUE="$catalogue"
+transaction='1 pacman -- --noconfirm --noprogressbar --noscriptlet --ask=4'
+
+# The checkout's vdpm is the SDK's.
+: > "$log"
+VITASDK="$packaged" "$repository_root/vdpm" install zlib
+grep -Fqx 'unset install zlib' "$log" ||
+	fail 'the checkout vdpm did not hand over to the SDK client'
+
+if message=$(VITASDK="$temporary_root/missing" "$repository_root/vdpm" list 2>&1); then
+	fail 'the checkout vdpm accepted a root with no SDK'
+fi
+grep -q 'bootstrap-vitasdk.sh' <<< "$message" ||
+	fail "the checkout vdpm did not say how to get an SDK: $message"
+
+# Copied over the SDK client it would only call itself.
+self="$temporary_root/self"
+mkdir -p "$self/bin"
+cp "$repository_root/vdpm" "$self/bin/vdpm"
+if VITASDK="$self" "$self/bin/vdpm" list 2>/dev/null; then
+	fail 'the checkout vdpm handed over to itself'
+fi
+
+# install-all brings the SDK to its release's current packages, then installs
+# the list in one transaction: without the packages the release lacks, and with
+# the OpenSSL the release's curl needs.
+: > "$log"
+VITASDK="$packaged" "$repository_root/install-all.sh" 2>/dev/null >/dev/null
+grep -Fqx '1 refresh 2026.08' "$log" || fail 'install-all did not update the release first'
+installed=$(grep -F "$transaction --sync --needed " "$log") ||
+	fail 'install-all did not install in one transaction'
+(( $(grep -c -- '--sync --needed' "$log") == 1 )) || fail 'install-all ran more than one transaction'
+[[ " $installed " == *' zlib '* && " $installed " == *' sdl3_ttf ' ]] ||
+	fail "install-all did not install the whole list: $installed"
+[[ " $installed " != *' cpython '* ]] || fail 'install-all installed a package the release lacks'
+[[ " $installed " == *' openssl-1.1.1 '* && " $installed " != *' openssl '* ]] ||
+	fail 'install-all asked for the openssl that conflicts with what curl needs'
+
+# An old checkout's install-all unpacks archives into a package-client SDK and
+# leaves its package list. Only what is exactly the archive's file and owned by
+# no package is moved aside for pacman; nothing of anybody else's is touched.
+archives="$temporary_root/archives"
+mkdir -p "$archives/zlib/include" "$archives/zlib/lib"
+printf 'zlib archive header\n' > "$archives/zlib/include/zlib.h"
+printf 'zlib archive library\n' > "$archives/zlib/lib/libz.a"
+printf 'owned by a package\n' > "$archives/zlib/lib/libowned.a"
+tar -cJf "$archives/zlib.tar.xz" -C "$archives/zlib" include lib
+sysroot="$packaged/arm-vita-eabi"
+mkdir -p "$sysroot/include" "$sysroot/lib" "$packaged/etc/vdpm"
+cp "$archives/zlib/lib/libz.a" "$archives/zlib/lib/libowned.a" "$sysroot/lib/"
+printf 'zlib header somebody edited\n' > "$sysroot/include/zlib.h"
+printf 'a library somebody built\n' > "$sysroot/lib/libmine.a"
+printf '%s\n' "$sysroot/lib/libowned.a" > "$temporary_root/owned"
+printf 'PACKAGE zlib\n\n' > "$packaged/etc/vdpm/packages.list"
+
+# When the installation fails anyway, the SDK keeps what it had.
+if VDPM_ARCHIVE_URL="file://$archives" FAKE_OWNED="$temporary_root/owned" FAKE_INSTALL_FAILS=1 \
+	VITASDK="$packaged" "$repository_root/install-all.sh" >/dev/null 2>&1; then
+	fail 'install-all reported a failed installation as done'
+fi
+cmp -s "$archives/zlib/lib/libz.a" "$sysroot/lib/libz.a" ||
+	fail 'install-all left the SDK without the files it set aside'
+[[ -f $packaged/etc/vdpm/packages.list ]] ||
+	fail 'install-all forgot the archive files after a failed installation'
+
+: > "$log"
+VDPM_ARCHIVE_URL="file://$archives" FAKE_OWNED="$temporary_root/owned" FAKE_INSTALL_REPLACES=1 \
+	VITASDK="$packaged" "$repository_root/install-all.sh" >/dev/null 2>&1 ||
+	fail 'install-all failed on an SDK an old checkout installed archives into'
+[[ $(cat "$sysroot/lib/libz.a") == 'installed by pacman' ]] &&
+	cmp -s "$archives/zlib/lib/libz.a" "$packaged"/var/lib/vdpm/archive-files.*/lib/libz.a ||
+	fail 'install-all did not replace the staged archive file'
+grep -q 'somebody edited' "$sysroot/include/zlib.h" || fail 'install-all moved a file somebody changed'
+[[ -f $sysroot/lib/libmine.a ]] || fail 'install-all moved a library that is not from an archive'
+[[ -f $sysroot/lib/libowned.a ]] || fail 'install-all moved a file a package owns'
+! grep -Fq -- '--overwrite' "$log" || fail 'install-all overwrote files'
+[[ ! -e $packaged/etc/vdpm/packages.list && -e $packaged/etc/vdpm/packages.list.adopted ]] ||
+	fail 'install-all left the archive package list to be looked at again'
+rm -rf "$sysroot" "$packaged/var"
+
+
+# A mixed SDK upgraded without install-all still has archive-only packages.
+# A successful refresh must restore files it never adopted, and keep the list.
+make_archive_fixture() {
+	local sdk=$1
+	make_packaged_sdk "$sdk"
+	mkdir -p "$sdk/etc/vdpm" "$sdk/var/lib/vdpm" "$sdk/arm-vita-eabi/include" "$sdk/arm-vita-eabi/lib"
+	cp "$archives/zlib/include/zlib.h" "$sdk/arm-vita-eabi/include/zlib.h"
+	cp "$archives/zlib/lib/libz.a" "$sdk/arm-vita-eabi/lib/libz.a"
+	printf 'PACKAGE zlib\n' > "$sdk/etc/vdpm/packages.list"
+}
+
+fixture="$temporary_root/update-unregistered"
+make_archive_fixture "$fixture"
+: > "$log"
+VDPM_ARCHIVE_URL="file://$archives" VITASDK="$fixture" "$repository_root/vitasdk-update" >/dev/null 2>&1 ||
+	fail 'refresh of mixed archive/package-client SDK failed'
+cmp -s "$archives/zlib/lib/libz.a" "$fixture/arm-vita-eabi/lib/libz.a" ||
+	fail 'successful refresh lost unregistered zlib'
+[[ -f $fixture/etc/vdpm/packages.list && ! -e $fixture/etc/vdpm/packages.list.adopted ]] ||
+	fail 'successful refresh retired a still-needed legacy list'
+
+
+# A legacy archive can be temporarily unavailable or corrupt. Refresh should
+# still succeed without dropping packages.list: that list is what allows a
+# later install-all to move aside the unowned files when the archive returns.
+for state in missing corrupt; do
+	fixture="$temporary_root/archive-$state"
+	make_archive_fixture "$fixture"
+	archive_source="$temporary_root/source-$state"
+	mkdir -p "$archive_source"
+	if [[ $state == corrupt ]]; then
+		printf 'not an xz archive\n' > "$archive_source/zlib.tar.xz"
+	fi
+	VDPM_ARCHIVE_URL="file://$archive_source" VITASDK="$fixture" \
+		"$repository_root/vitasdk-update" >/dev/null 2>&1 ||
+		fail "update failed on an $state archive"
+	[[ -f $fixture/etc/vdpm/packages.list &&
+		! -e $fixture/etc/vdpm/packages.list.adopted ]] ||
+		fail "update retired packages.list despite an $state archive"
+	cmp -s "$archives/zlib/lib/libz.a" "$fixture/arm-vita-eabi/lib/libz.a" ||
+		fail "update altered unowned zlib with an $state archive"
+
+	# Real pacman rejects paths still owned by no package. The test client
+	# models that check, then installs zlib after migration clears the paths.
+	VDPM_ARCHIVE_URL="file://$archives" FAKE_REFUSE_UNOWNED_ZLIB=1 FAKE_INSTALL_ZLIB=1 \
+		VITASDK="$fixture" "$repository_root/install-all.sh" >/dev/null 2>&1 ||
+		fail "install-all could not recover after the $state archive returned"
+	[[ ! -e $fixture/etc/vdpm/packages.list &&
+		-f $fixture/etc/vdpm/packages.list.adopted ]] ||
+		fail "install-all did not adopt the recovered $state archive"
+	[[ $(cat "$fixture/arm-vita-eabi/lib/libz.a") == 'installed by pacman' ]] ||
+		fail "install-all did not install recovered zlib after $state"
+	[[ $(cat "$fixture/arm-vita-eabi/include/zlib.h") == 'installed by pacman' ]] ||
+		fail "install-all did not install recovered zlib headers after $state"
+done
+
+# A successful but incomplete transaction must likewise restore the originals.
+fixture="$temporary_root/install-no-replacement"
+make_archive_fixture "$fixture"
+VDPM_ARCHIVE_URL="file://$archives" VITASDK="$fixture" "$repository_root/install-all.sh" >/dev/null 2>&1 ||
+	fail 'incomplete synthetic install-all failed'
+cmp -s "$archives/zlib/lib/libz.a" "$fixture/arm-vita-eabi/lib/libz.a" ||
+	fail 'successful install-all lost a file it did not replace'
+[[ -f $fixture/etc/vdpm/packages.list ]] ||
+	fail 'successful incomplete install-all retired its legacy list'
+
+# Ownership is path-based: spaces or a trailing slash must not hide files
+# already registered with pacman.
+for variant in 'sdk with spaces' 'sdk-with-slash'; do
+	fixture="$temporary_root/$variant"
+	make_archive_fixture "$fixture"
+	printf '%s\n%s\n' "$fixture/arm-vita-eabi/include/zlib.h" \
+		"$fixture/arm-vita-eabi/lib/libz.a" > "$temporary_root/owned-$variant"
+	fixture_arg=$fixture
+	[[ $variant != sdk-with-slash ]] || fixture_arg="$fixture/"
+	VDPM_ARCHIVE_URL="file://$archives" FAKE_OWNED="$temporary_root/owned-$variant" \
+		VITASDK="$fixture_arg" "$repository_root/vitasdk-update" >/dev/null 2>&1 ||
+		fail "update with $variant failed"
+	cmp -s "$archives/zlib/lib/libz.a" "$fixture/arm-vita-eabi/lib/libz.a" ||
+		fail "update moved owned files under $variant"
+	if find "$fixture/var/lib/vdpm" -type d -name 'archive-files.*' | grep -q .; then
+		fail "update staged owned files under $variant"
+	fi
+done
+
+# A broken ownership query must abort before moving anything or refreshing.
+fixture="$temporary_root/query-fails"
+make_archive_fixture "$fixture"
+: > "$log"
+if VDPM_ARCHIVE_URL="file://$archives" FAKE_QUERY_FAILS=1 \
+	VITASDK="$fixture" "$repository_root/vitasdk-update" >/dev/null 2>&1; then
+	fail 'ownership query failure was ignored'
+fi
+cmp -s "$archives/zlib/lib/libz.a" "$fixture/arm-vita-eabi/lib/libz.a" ||
+	fail 'failed ownership query moved an installed file'
+! grep -q '^1 refresh ' "$log" ||
+	fail 'refresh ran after a failed ownership query'
+
+# Stale .staged state is not proof that this refresh verified new metadata.
+fixture="$temporary_root/refresh-before-staging"
+make_archive_fixture "$fixture"
+: > "$fixture/var/lib/vdpm/channel.json.staged"
+: > "$log"
+if VDPM_ARCHIVE_URL="file://$archives" FAKE_REFRESH_PRESTAGE_FAILS=1 FAKE_OPENSSL_CONFLICT=1 \
+	VITASDK="$fixture" "$repository_root/vitasdk-update" >/dev/null 2>&1; then
+	fail 'refresh before repository staging succeeded'
+fi
+! grep -Fq -- '--sync --sysupgrade --sysupgrade' "$log" ||
+	fail 'early refresh failure ran fallback against stale databases'
+cmp -s "$archives/zlib/lib/libz.a" "$fixture/arm-vita-eabi/lib/libz.a" ||
+	fail 'failed refresh did not restore staged archive'
+
+# Even after staging, an unrelated failure must not trigger conflict recovery.
+fixture="$temporary_root/refresh-unrelated-failure"
+make_archive_fixture "$fixture"
+: > "$log"
+if VDPM_ARCHIVE_URL="file://$archives" FAKE_REFRESH_FAILS=1 \
+	VITASDK="$fixture" "$repository_root/vitasdk-update" >/dev/null 2>&1; then
+	fail 'unrelated transaction failure succeeded'
+fi
+! grep -Fq -- '--sync --sysupgrade --sysupgrade' "$log" ||
+	fail 'unrelated transaction failure invoked OpenSSL fallback'
+cmp -s "$archives/zlib/lib/libz.a" "$fixture/arm-vita-eabi/lib/libz.a" ||
+	fail 'unrelated transaction failure did not restore archive'
+
+# A catalogue published incomplete is not an installation to report as done.
+: > "$log"
+if FAKE_CATALOGUE="$temporary_root/partial-catalogue" \
+	VITASDK="$packaged" "$repository_root/install-all.sh" >/dev/null 2>&1; then
+	fail 'install-all succeeded on a catalogue missing most of the list'
+fi
+! grep -q -- '--sync --needed' "$log" || fail 'install-all installed from an incomplete catalogue'
+
+# A refresh whose transaction fails on a conflict is finished, then recorded.
+rm -f "$packaged/refreshed-once"
+: > "$log"
+FAKE_REFRESH_FAILS=1 FAKE_OPENSSL_CONFLICT=1 VITASDK="$packaged" "$repository_root/vitasdk-update" >/dev/null 2>&1 ||
+	fail 'vitasdk-update gave up on a refresh it can finish'
+grep -Fqx "$transaction --sync --sysupgrade --sysupgrade" "$log" ||
+	fail 'vitasdk-update did not resolve the failed transaction'
+(( $(grep -c '^1 refresh 2026.08$' "$log") == 2 )) ||
+	fail 'vitasdk-update did not record the release after resolving it'
+
+# An update is a refresh of the release the SDK follows, nothing else.
+: > "$log"
+VITASDK="$packaged" "$repository_root/vitasdk-update" >/dev/null
+grep -Fqx '1 refresh 2026.08' "$log" || fail 'vitasdk-update did not refresh the release'
+! grep -Fq 'transaction' "$log" || fail 'vitasdk-update ran a transaction it did not need'
+
+# An SDK unpacked from an archive follows no release; it gets the one the
+# bootstrap would have chosen, or the one named.
+: > "$log"
+FAKE_RELEASE= VITASDK="$packaged" "$repository_root/install-all.sh" >/dev/null 2>&1 ||
+	fail 'install-all gave up on an SDK that follows no release'
+grep -Fqx '1 refresh 2026.08' "$log" || fail 'install-all did not select the newest supported release'
+: > "$log"
+FAKE_RELEASE= VITASDK_CHANNEL=nightly VITASDK="$packaged" "$repository_root/vitasdk-update" >/dev/null 2>&1 ||
+	fail 'vitasdk-update gave up on an SDK that follows no release'
+grep -Fqx '1 refresh nightly' "$log" || fail 'vitasdk-update did not select the release it was told'
+
+# A legacy SDK installs as it always did, one archive at a time, with the
+# OpenSSL 1.0.2 its archive curl is built against, adding only what is missing.
+: > "$log"
+VITASDK="$legacy" "$repository_root/install-all.sh"
+grep -Fqx '1 cpython' "$log" || fail 'install-all skipped a package on a legacy SDK'
+! grep -q ' -f ' "$log" || fail 'install-all reinstalled archives the archive client cannot reinstall on macOS'
+grep -Fqx '1 openssl' "$log" && ! grep -Fqx '1 openssl-1.1.1' "$log" ||
+	fail 'install-all gave a legacy SDK an OpenSSL its curl does not link with'
+! grep -Eq ' (status|search|refresh|pacman)' "$log" || fail 'install-all asked a legacy client what it cannot answer'
+
+if message=$(VITASDK="$legacy" "$repository_root/vitasdk-update" 2>&1); then
+	fail 'vitasdk-update accepted a legacy SDK'
+fi
+grep -q 'bootstrap-vitasdk.sh' <<< "$message" ||
+	fail "vitasdk-update did not say how to get a new SDK: $message"
+
+# The way vita-headers and samples CI install packages.
+ci="$temporary_root/ci"
+mkdir -p "$ci"
+cp "$repository_root/vdpm" "$ci/vdpm"
+sed -e 's/\.\.\///' "$repository_root/include/install-packages.sh" > "$ci/install-packages.sh"
+: > "$log"
+(cd "$ci" && sed -e 's/include\///' "$repository_root/install-all.sh" |
+	VITASDK="$packaged" bash >/dev/null 2>&1) ||
+	fail 'the CI installation pattern failed'
+grep -q -- "--sync --needed .* sdl3_ttf" "$log" || fail 'the CI installation pattern did not install the list'
+
+printf 'legacy entry point contracts passed\n'

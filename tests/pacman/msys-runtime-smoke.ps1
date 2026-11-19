@@ -65,7 +65,8 @@ function New-ProbePackage(
     [string]$Output,
     [string]$Name,
     [string]$Version,
-    [System.Collections.IDictionary]$Files
+    [System.Collections.IDictionary]$Files,
+    [string]$TarProgram
 ) {
     if (Test-Path $Root) {
         Remove-Item -Recurse -Force $Root
@@ -81,7 +82,8 @@ function New-ProbePackage(
         $archiveEntries += $entry.Key
     }
 
-    Invoke-Checked "tar.exe" (@("-cJf", $Output, "-C", $Root) + $archiveEntries)
+    # Windows' tar.exe crashes on entry names outside the ANSI code page.
+    Invoke-Checked $TarProgram (@("-cJf", $Output, "-C", $Root) + $archiveEntries)
 }
 
 function New-CaseCollisionPackage([string]$Root, [string]$Output, [string]$TarProgram) {
@@ -207,7 +209,7 @@ if ($Extended) {
     $packageFiles[$replaceRelativePath] = "version 1`n"
     $packageFiles[$removedRelativePath] = "removed by upgrade`n"
 }
-New-ProbePackage $packageRoot $packagePath "vitasdk-msys-probe" "1.0-1" $packageFiles
+New-ProbePackage $packageRoot $packagePath "vitasdk-msys-probe" "1.0-1" $packageFiles $FixtureTar
 
 $pacman = Join-Path $pacmanBin "pacman.exe"
 $commonArguments = @(
@@ -269,7 +271,7 @@ try {
             $addedRelativePath = "added by upgrade`n"
         }
         New-ProbePackage $packageV2Root $packageV2Path `
-            "vitasdk-msys-probe" "2.0-1" $packageV2Files
+            "vitasdk-msys-probe" "2.0-1" $packageV2Files $FixtureTar
         Invoke-Checked $pacman @(
             $commonArguments + @(
                 "--upgrade", "--noscriptlet", "--noconfirm", (Get-MixedPath $packageV2Path)

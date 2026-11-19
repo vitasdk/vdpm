@@ -205,7 +205,8 @@ jobs:
       - name: Fetch FreeBSD base for the sysroot
         if: steps.sysroot-cache.outputs.cache-hit != 'true'
         run: |
-          curl --fail --location --silent --show-error -o base.txz \
+          curl --fail --location --silent --show-error \
+            --connect-timeout 20 --retry 5 --retry-all-errors --retry-delay 10 -o base.txz \
             "https://archive.freebsd.org/old-releases/${{ matrix.freebsd_arch_dir }}/$FREEBSD_RELEASE/base.txz"
           mkdir -p freebsd-sysroot
           # Only headers and libraries; the rest of base.txz goes unused.
